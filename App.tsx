@@ -37,13 +37,14 @@ const App: React.FC = () => {
     };
   });
 
-  // CRITICAL: Immediate check against the Telegram Session for Admin ID
+  // CRITICAL: Check admin status directly from Telegram WebApp API (not from profile state)
   const isAdmin = useMemo(() => {
-    const tgId = String(profile.telegramId || '');
-    const match = tgId === ADMIN_ID || tgId === String(ADMIN_ID);
-    if (tgId && tgId !== '0') {
-      console.log(`[LEX] Admin check: telegramId="${tgId}" vs admin="${ADMIN_ID}" → ${match}`);
-    }
+    // Read directly from Telegram SDK — avoids race condition with profile hydration
+    const tg = (window as any).Telegram?.WebApp;
+    const tgUserId = tg?.initDataUnsafe?.user?.id;
+    const tgId = String(tgUserId || profile.telegramId || '');
+    const match = tgId !== '' && tgId === ADMIN_ID;
+    console.log(`[LEX] Admin check: tgUserId="${tgUserId}" profileId="${profile.telegramId}" admin="${ADMIN_ID}" → ${match}`);
     return match;
   }, [profile.telegramId]);
 
