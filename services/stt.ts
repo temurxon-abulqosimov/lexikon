@@ -95,94 +95,126 @@ export class AssemblyAIRecorder {
       });
     }
 
-    const token = await getTemporaryToken();
-
-    this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-
-    if (this.audioContext.state === "suspended") {
-      await this.audioContext.resume();
-    }
-
+    // Step 1: Fetch token
+    let token: string;
     try {
-      await this.audioContext.audioWorklet.addModule(
-        "/audio-processor.js"
-      );
-    } catch {
-      const blob = new Blob(
-        [
-          `
-          class AudioProcessor extends AudioWorkletProcessor {
-            _buffer = new Float32Array(0);
-            _chunkSize = ${CHUNK_SIZE};
-
-            process(inputs) {
-              const input = inputs[0];
-              if (!input || !input[0]) return true;
-
-              const mono = input[0];
-              const newBuffer = new Float32Array(this._buffer.length + mono.length);
-              newBuffer.set(this._buffer);
-              newBuffer.set(mono, this._buffer.length);
-              this._buffer = newBuffer;
-
-              while (this._buffer.length >= this._chunkSize) {
-                const chunk = this._buffer.slice(0, this._chunkSize);
-                this._buffer = this._buffer.slice(this._chunkSize);
-                this.port.postMessage({ audio: chunk });
-              }
-
-              return true;
-            }
-          }
-          registerProcessor("audio-processor", AudioProcessor);
-          `,
-        ],
-        { type: "application/javascript" }
-      );
-      const url = URL.createObjectURL(blob);
-      await this.audioContext.audioWorklet.addModule(url);
-      URL.revokeObjectURL(url);
+      token = await getTemporaryToken();
+    } catch (e: any) {
+      throw new Error(`AUTH_FAILED: ${e?.message || "Token fetch failed"}`);
     }
 
-    const source = this.audioContext.createMediaStreamSource(this.mediaStream);
-    this.workletNode = new AudioWorkletNode(this.audioContext, "audio-processor");
-    source.connect(this.workletNode);
+    // Step 2: Create AudioContext
+    try {
+      this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+      if (this.audioContext.state === "suspended") {
+        await this.audioContext.resume();
+      }
+    } catch (e: any) {
+      throw new Error(`AUDIOCTX_FAILED: ${e?.message || "AudioContext creation failed"}`);
+    }
 
+    // Step 3: Load AudioWorklet
+    try {
+      await this.audioContext.audioWorklet.addModule("/audio-processor.js");
+    } catch {
+      // Fallback: inline worklet via Blob URL
+      try {
+        const blob = new Blob(
+          [
+            `
+            class AudioProcessor extends AudioWorkletProcessor {
+              _buffer = new Float32Array(0);
+              _chunkSize = ${CHUNK_SIZE};
+              process(inputs) {
+                const input = inputs[0];
+                if (!input || !input[0]) return true;
+                const mono = input[0];
+                const newBuf = new Float32Array(this._buffer.length + mono.length);
+                newBuf.set(this._buffer);
+                newBuf.set(mono, this._buffer.length);
+                this._buffer = newBuf;
+                while (this._buffer.length >= this._chunkSize) {
+                  const chunk = this._buffer.slice(0, this._chunkSize);
+                  this._buffer = this._buffer.slice(this._chunkSize);
+                  this.port.postMessage({ audio: chunk });
+                }
+                return true;
+              }
+            }
+            registerProcessor("audio-processor", AudioProcessor);
+            `,
+          ],
+          { type: "application/javascript" }
+        );
+        const url = URL.createObjectURL(blob);
+        await this.audioContext.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+      } catch (e: any) {
+        throw new Error(`WORKLET_FAILED: ${e?.message || "AudioWorklet not supported on this device"}`);
+      }
+    }
+
+    // Step 4: Connect audio source
+    try {
+      const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+      this.workletNode = new AudioWorkletNode(this.audioContext, "audio-processor");
+      source.connect(this.workletNode);
+    } catch (e: any) {
+      throw new Error(`SOURCE_FAILED: ${e?.message || "Audio graph setup failed"}`);
+    }
+
+    // Step 5: Open WebSocket with timeout
     const wsUrl = `${ASSEMBLYAI_WS}?token=${token}`;
-    this.ws = new WebSocket(wsUrl);
 
-    this.ws.onopen = () => {
-      this.isRecording = true;
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("WS_TIMEOUT: WebSocket connection timed out"));
+      }, 10000);
 
-      const config: Record<string, unknown> = {
-        sample_rate: SAMPLE_RATE,
-        audio_encoding: "pcm_s16le",
-        format_text: true,
-        ...buildLanguageConfig(this.options.language),
-      };
+      this.ws = new WebSocket(wsUrl);
 
-      this.ws!.send(JSON.stringify({ type: "session.update", config }));
+      this.ws.onopen = () => {
+        clearTimeout(timeout);
+        this.isRecording = true;
 
-      this.workletNode!.port.onmessage = (event: MessageEvent) => {
-        if (
-          this.ws?.readyState === WebSocket.OPEN &&
-          event.data.audio
-        ) {
-          const float32 = event.data.audio as Float32Array;
-          const int16 = new Int16Array(float32.length);
-          for (let i = 0; i < float32.length; i++) {
-            const s = Math.max(-1, Math.min(1, float32[i]));
-            int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        const config: Record<string, unknown> = {
+          sample_rate: SAMPLE_RATE,
+          audio_encoding: "pcm_s16le",
+          format_text: true,
+          ...buildLanguageConfig(this.options.language),
+        };
+
+        this.ws!.send(JSON.stringify({ type: "session.update", config }));
+
+        this.workletNode!.port.onmessage = (event: MessageEvent) => {
+          if (
+            this.ws?.readyState === WebSocket.OPEN &&
+            event.data.audio
+          ) {
+            const float32 = event.data.audio as Float32Array;
+            const int16 = new Int16Array(float32.length);
+            for (let i = 0; i < float32.length; i++) {
+              const s = Math.max(-1, Math.min(1, float32[i]));
+              int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            }
+            const base64 = btoa(
+              String.fromCharCode(...new Uint8Array(int16.buffer))
+            );
+            this.ws!.send(
+              JSON.stringify({ type: "audio.data", audio: base64 })
+            );
           }
-          const base64 = btoa(
-            String.fromCharCode(...new Uint8Array(int16.buffer))
-          );
-          this.ws!.send(
-            JSON.stringify({ type: "audio.data", audio: base64 })
-          );
-        }
+        };
+
+        resolve();
       };
-    };
+
+      this.ws.onerror = (e) => {
+        clearTimeout(timeout);
+        console.error("AssemblyAI WebSocket error:", e);
+        reject(new Error("WS_FAILED: WebSocket connection failed"));
+      };
+    });
 
     this.ws.onmessage = (event) => {
       try {
@@ -200,11 +232,6 @@ export class AssemblyAIRecorder {
       } catch {
         // ignore parse errors
       }
-    };
-
-    this.ws.onerror = (e) => {
-      console.error("AssemblyAI WebSocket error:", e);
-      this.options.onError?.(new Error("WebSocket connection failed"));
     };
 
     this.ws.onclose = () => {

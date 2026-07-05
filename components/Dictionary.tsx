@@ -232,28 +232,46 @@ const Dictionary: React.FC<Props> = ({
         // Now safe to do async work (token fetch, WebSocket) — mic permission already granted
         await recorder.start(stream);
       } catch (err: any) {
-        console.error("AssemblyAI start failed:", err);
+        console.error("Voice search failed:", err);
         setIsListening(false);
         sttRef.current = null;
 
-        const name = err?.name || "";
-        const msg = err?.message || "";
+        // Extract the real error message (unwraps nested errors)
+        const raw = err?.message || err?.name || String(err);
+        const msg = raw.includes(":") ? raw.split(":").pop().trim() : raw;
+        const full = `${err?.name || "Error"}: ${msg}`;
 
-        if (
-          name === "NotAllowedError" ||
-          name === "PermissionDeniedError" ||
-          msg.includes("denied") ||
-          msg.includes("Permission")
+        console.log("STT DEBUG:", full);
+
+        if (msg.includes("AUTH_FAILED") || msg.includes("401") || msg.includes("403")) {
+          setVoiceStatusMsg("AssemblyAI key invalid or expired");
+        } else if (msg.includes("not configured")) {
+          setVoiceStatusMsg("AssemblyAI key missing");
+        } else if (msg.includes("WORKLET_FAILED") || msg.includes("not supported")) {
+          setVoiceStatusMsg("AudioWorklet unsupported — try Chrome");
+        } else if (msg.includes("AUDIOCTX_FAILED")) {
+          setVoiceStatusMsg("AudioContext blocked by browser");
+        } else if (msg.includes("WS_FAILED") || msg.includes("WS_TIMEOUT")) {
+          setVoiceStatusMsg("Connection failed — check network");
+        } else if (
+          err?.name === "NotAllowedError" ||
+          err?.name === "PermissionDeniedError" ||
+          msg.toLowerCase().includes("notallowed") ||
+          msg.toLowerCase().includes("permission") ||
+          msg.toLowerCase().includes("denied")
         ) {
-          setVoiceStatusMsg("Mic permission denied — check Settings > Safari > Microphone");
-        } else if (name === "NotFoundError") {
-          setVoiceStatusMsg("No microphone found");
-        } else if (name === "NotReadableError") {
-          setVoiceStatusMsg("Mic in use by another app");
+          setVoiceStatusMsg("Mic blocked — open Settings > Safari > Microphone");
+        } else if (err?.name === "NotFoundError" || msg.includes("Requested device not found")) {
+          setVoiceStatusMsg("No mic detected on this device");
+        } else if (err?.name === "NotReadableError" || msg.includes("Could not start")) {
+          setVoiceStatusMsg("Mic in use — close other apps using mic");
+        } else if (msg.includes("HTTPS") || msg.includes("secure context")) {
+          setVoiceStatusMsg("Microphone requires HTTPS");
         } else {
-          setVoiceStatusMsg("Voice access failed — retry");
+          // Show the actual error so user can report it
+          setVoiceStatusMsg(`Voice: ${msg.substring(0, 80)}`);
         }
-        setTimeout(() => setVoiceStatusMsg(null), 5000);
+        setTimeout(() => setVoiceStatusMsg(null), 8000);
       }
       return;
     }
