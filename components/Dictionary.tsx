@@ -191,97 +191,12 @@ const Dictionary: React.FC<Props> = ({
     setInterimText('');
   };
 
-  const startVoiceSearch = async () => {
-    setInterimText('');
-
-    // Prefer AssemblyAI if API key is configured
-    if (isAssemblyAIAvailable()) {
-      try {
-        const recorder = new AssemblyAIRecorder({
-          language: sourceLang,
-          onInterim: (text) => {
-            setInterimText(text);
-            setQuery(text);
-          },
-          onFinal: (text) => {
-            setInterimText('');
-            setIsListening(false);
-            setQuery(text);
-            handleSearch(text);
-            sttRef.current = null;
-          },
-          onError: (err) => {
-            console.error("AssemblyAI STT error:", err);
-            setIsListening(false);
-            setInterimText('');
-            setVoiceStatusMsg("Voice error — retry");
-            setTimeout(() => setVoiceStatusMsg(null), 3000);
-            sttRef.current = null;
-          },
-        });
-
-        sttRef.current = recorder;
-
-        // CRITICAL for iOS: request mic permission FIRST (synchronously in gesture),
-        // then do async work. This keeps the user gesture chain intact.
-        const stream = await recorder.requestMicPermission();
-
-        setIsListening(true);
-        setShowSuggestions(false);
-
-        // Now safe to do async work (token fetch, WebSocket) — mic permission already granted
-        await recorder.start(stream);
-      } catch (err: any) {
-        console.error("Voice search failed:", err);
-        setIsListening(false);
-        sttRef.current = null;
-
-        // Extract the real error message (unwraps nested errors)
-        const raw = err?.message || err?.name || String(err);
-        const msg = raw.includes(":") ? raw.split(":").pop().trim() : raw;
-        const full = `${err?.name || "Error"}: ${msg}`;
-
-        console.log("STT DEBUG:", full);
-
-        if (msg.includes("AUTH_FAILED") || msg.includes("401") || msg.includes("403")) {
-          setVoiceStatusMsg("AssemblyAI key invalid or expired");
-        } else if (msg.includes("not configured")) {
-          setVoiceStatusMsg("AssemblyAI key missing");
-        } else if (msg.includes("WORKLET_FAILED") || msg.includes("not supported")) {
-          setVoiceStatusMsg("AudioWorklet unsupported — try Chrome");
-        } else if (msg.includes("AUDIOCTX_FAILED")) {
-          setVoiceStatusMsg("AudioContext blocked by browser");
-        } else if (msg.includes("WS_FAILED") || msg.includes("WS_TIMEOUT")) {
-          setVoiceStatusMsg("Connection failed — check network");
-        } else if (
-          err?.name === "NotAllowedError" ||
-          err?.name === "PermissionDeniedError" ||
-          msg.toLowerCase().includes("notallowed") ||
-          msg.toLowerCase().includes("permission") ||
-          msg.toLowerCase().includes("denied")
-        ) {
-          setVoiceStatusMsg("Mic blocked — open Settings > Safari > Microphone");
-        } else if (err?.name === "NotFoundError" || msg.includes("Requested device not found")) {
-          setVoiceStatusMsg("No mic detected on this device");
-        } else if (err?.name === "NotReadableError" || msg.includes("Could not start")) {
-          setVoiceStatusMsg("Mic in use — close other apps using mic");
-        } else if (msg.includes("HTTPS") || msg.includes("secure context")) {
-          setVoiceStatusMsg("Microphone requires HTTPS");
-        } else {
-          // Show the actual error so user can report it
-          setVoiceStatusMsg(`Voice: ${msg.substring(0, 80)}`);
-        }
-        setTimeout(() => setVoiceStatusMsg(null), 8000);
-      }
-      return;
-    }
-
-    // Fallback: browser SpeechRecognition
+  const startBrowserSTT = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
-      setVoiceStatusMsg("Voice access restricted");
-      setTimeout(() => setVoiceStatusMsg(null), 3000);
+      setVoiceStatusMsg("Voice access restricted on this browser");
+      setTimeout(() => setVoiceStatusMsg(null), 4000);
       return;
     }
 
@@ -324,6 +239,65 @@ const Dictionary: React.FC<Props> = ({
     } catch (e) {
       setIsListening(false);
     }
+  };
+
+  const startVoiceSearch = async () => {
+    setInterimText('');
+
+    // Try AssemblyAI first (token fetched via server proxy)
+    if (isAssemblyAIAvailable()) {
+      try {
+        const recorder = new AssemblyAIRecorder({
+          language: sourceLang,
+          onInterim: (text) => {
+            setInterimText(text);
+            setQuery(text);
+          },
+          onFinal: (text) => {
+            setInterimText('');
+            setIsListening(false);
+            setQuery(text);
+            handleSearch(text);
+            sttRef.current = null;
+          },
+          onError: (err) => {
+            console.error("AssemblyAI STT error:", err);
+            setIsListening(false);
+            setInterimText('');
+            setVoiceStatusMsg("Voice error — retry");
+            setTimeout(() => setVoiceStatusMsg(null), 3000);
+            sttRef.current = null;
+          },
+        });
+
+        sttRef.current = recorder;
+
+        // CRITICAL for iOS: request mic permission FIRST (synchronously in gesture),
+        // then do async work. This keeps the user gesture chain intact.
+        const stream = await recorder.requestMicPermission();
+
+        setIsListening(true);
+        setShowSuggestions(false);
+
+        // Now safe to do async work (token fetch, WebSocket) — mic permission already granted
+        await recorder.start(stream);
+        return; // AssemblyAI connected successfully
+      } catch (err: any) {
+        console.error("AssemblyAI failed, falling back to browser STT:", err);
+        sttRef.current = null;
+        setIsListening(false);
+        setInterimText('');
+
+        // Log specific error for debugging
+        const raw = err?.message || String(err);
+        console.log("STT error:", raw);
+
+        // Fall through to browser SpeechRecognition below
+      }
+    }
+
+    // Fallback: browser SpeechRecognition
+    startBrowserSTT();
   };
 
   const handleSearch = async (overrideQuery?: string) => {

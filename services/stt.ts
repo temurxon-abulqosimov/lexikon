@@ -1,7 +1,7 @@
 import { Language } from "../types";
 
-const ASSEMBLYAI_BASE = "https://api.assemblyai.com/v2";
 const ASSEMBLYAI_WS = "wss://api.assemblyai.com/v2/realtime";
+const TOKEN_PROXY = "/api/get-token";
 const SAMPLE_RATE = 16000;
 const CHANNELS = 1;
 const CHUNK_SIZE = 4096;
@@ -19,23 +19,15 @@ interface STTOptions {
   onError?: (err: Error) => void;
 }
 
-function getApiKey(): string {
-  return (process.env.ASSEMBLYAI_API_KEY as string) || "";
-}
-
 async function getTemporaryToken(): Promise<string> {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("ASSEMBLYAI_API_KEY is not configured");
-
-  const res = await fetch(`${ASSEMBLYAI_BASE}/realtime/token`, {
+  const res = await fetch(TOKEN_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ expires_in: 300 }),
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`AssemblyAI token error: ${res.status} – ${errText}`);
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Token proxy error: ${res.status}`);
   }
 
   const data = await res.json();
@@ -273,5 +265,7 @@ export class AssemblyAIRecorder {
 }
 
 export function isAssemblyAIAvailable(): boolean {
-  return !!getApiKey();
+  // Always attempt AssemblyAI — token is fetched server-side via proxy.
+  // If the proxy/key is misconfigured, start() will throw and the caller falls back.
+  return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 }
