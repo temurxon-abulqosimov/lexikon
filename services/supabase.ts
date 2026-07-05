@@ -31,17 +31,10 @@ export async function fetchAdminUsers() {
     // 1. Try `lex_profiles` first (primary user registry)
     const { data: profileData, error: profileError } = await supabase
       .from('lex_profiles')
-      .select('username, first_name, last_name, telegram_id, updated_at')
+      .select('*')
       .order('updated_at', { ascending: false });
 
-    if (profileError) {
-      console.warn(`[fetchAdminUsers] lex_profiles error:`, profileError);
-      if (!handleSupabaseError(profileError, 'lex_profiles')) {
-        return [];
-      }
-    }
-
-    if (profileData && profileData.length > 0) {
+    if (!profileError && profileData && profileData.length > 0) {
       return profileData.map(p => ({
         username: p.username,
         first_name: p.first_name || p.username || 'Scholar',
@@ -50,20 +43,31 @@ export async function fetchAdminUsers() {
       }));
     }
 
-    // 2. Fallback to `users` table
-    console.warn('[fetchAdminUsers] lex_profiles empty/missing, trying users table');
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('username, first_name, last_name, created_at')
-      .order('created_at', { ascending: false });
-
-    if (usersError) {
-      console.warn(`[fetchAdminUsers] users error:`, usersError);
-      handleSupabaseError(usersError, 'users');
-      return [];
+    if (profileError) {
+      console.warn(`[fetchAdminUsers] lex_profiles query failed, falling back to users:`, profileError);
     }
 
-    return usersData || [];
+    // 2. Fallback to `users` table
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('username, first_name, created_at')
+      .order('created_at', { ascending: false });
+
+    if (!usersError && usersData && usersData.length > 0) {
+      return usersData.map(u => ({
+        username: u.username,
+        first_name: u.first_name || u.username || 'Scholar',
+        last_name: u.last_name || '',
+        created_at: u.created_at
+      }));
+    }
+
+    if (usersError) {
+      console.warn(`[fetchAdminUsers] users table also failed:`, usersError);
+      handleSupabaseError(usersError, 'users');
+    }
+
+    return [];
   } catch (err) {
     console.error("[fetchAdminUsers] Failed:", err);
     return [];
