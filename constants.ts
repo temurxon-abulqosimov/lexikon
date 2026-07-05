@@ -1,13 +1,16 @@
 
 import { Language, LexicalEntry } from './types';
 
+// ElevenLabs Voice IDs
 export const VOICE_MAPPING: Record<Language, string> = {
-  German: 'Charon',   // Deeper, more mature tone for philological analysis
-  Uzbek: 'Zephyr',    // Best suited for Turkic phonetics
-  English: 'Fenrir',  // Authoritative and clear
-  Russian: 'Charon',  // Strong, resonant voice for Slavic vowels
-  Arabic: 'Kore',     // Clear, melodic tone for Semitic phonology
+  German: 'VR6AewLTigWG4xSOukaG',    // Arnold — authoritative male
+  Uzbek: '21m00Tcm4TlvDq8ikWAM',     // Rachel — warm female
+  English: 'ErXwobaYiN019PkySvjV',   // Antoni — well-rounded male
+  Russian: 'AZnzlk1XvdvUeBnXmlld',   // Domi — strong female
+  Arabic: 'EXAVITQu4vr4xnSDxMaL',    // Bella — soft melodic female
 };
+
+export const ELEVENLABS_MODEL = 'eleven_multilingual_v2';
 
 export const RANKS = [
   { minXp: 0, title: 'Lexical Novice' },
