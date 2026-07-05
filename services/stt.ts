@@ -62,11 +62,11 @@ export class AssemblyAIRecorder {
     this.options = options;
   }
 
-  async start(): Promise<void> {
-    if (this.isRecording) return;
-
-    const token = await getTemporaryToken();
-
+  /**
+   * Request mic permission FIRST (must be in user gesture on iOS).
+   * Returns the MediaStream so start() can use it later without re-prompting.
+   */
+  async requestMicPermission(): Promise<MediaStream> {
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: SAMPLE_RATE,
@@ -75,6 +75,27 @@ export class AssemblyAIRecorder {
         noiseSuppression: true,
       },
     });
+    return this.mediaStream;
+  }
+
+  async start(stream?: MediaStream): Promise<void> {
+    if (this.isRecording) return;
+
+    // Use pre-obtained stream or request one now (fallback)
+    if (stream) {
+      this.mediaStream = stream;
+    } else if (!this.mediaStream) {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: SAMPLE_RATE,
+          channelCount: CHANNELS,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+    }
+
+    const token = await getTemporaryToken();
 
     this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
 

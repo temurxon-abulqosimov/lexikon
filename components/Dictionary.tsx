@@ -192,7 +192,6 @@ const Dictionary: React.FC<Props> = ({
   };
 
   const startVoiceSearch = async () => {
-    await resumeAudioContext().catch(() => {});
     setInterimText('');
 
     // Prefer AssemblyAI if API key is configured
@@ -222,18 +221,39 @@ const Dictionary: React.FC<Props> = ({
         });
 
         sttRef.current = recorder;
-        await recorder.start();
+
+        // CRITICAL for iOS: request mic permission FIRST (synchronously in gesture),
+        // then do async work. This keeps the user gesture chain intact.
+        const stream = await recorder.requestMicPermission();
+
         setIsListening(true);
         setShowSuggestions(false);
+
+        // Now safe to do async work (token fetch, WebSocket) — mic permission already granted
+        await recorder.start(stream);
       } catch (err: any) {
         console.error("AssemblyAI start failed:", err);
         setIsListening(false);
-        const msg = err?.message?.includes("denied")
-          ? "Permission Denied"
-          : "Voice access failed";
-        setVoiceStatusMsg(msg);
-        setTimeout(() => setVoiceStatusMsg(null), 3000);
         sttRef.current = null;
+
+        const name = err?.name || "";
+        const msg = err?.message || "";
+
+        if (
+          name === "NotAllowedError" ||
+          name === "PermissionDeniedError" ||
+          msg.includes("denied") ||
+          msg.includes("Permission")
+        ) {
+          setVoiceStatusMsg("Mic permission denied — check Settings > Safari > Microphone");
+        } else if (name === "NotFoundError") {
+          setVoiceStatusMsg("No microphone found");
+        } else if (name === "NotReadableError") {
+          setVoiceStatusMsg("Mic in use by another app");
+        } else {
+          setVoiceStatusMsg("Voice access failed — retry");
+        }
+        setTimeout(() => setVoiceStatusMsg(null), 5000);
       }
       return;
     }
@@ -269,10 +289,14 @@ const Dictionary: React.FC<Props> = ({
 
     recognition.onerror = (event: any) => {
       setIsListening(false);
-      if (event.error === 'not-allowed') {
-        setVoiceStatusMsg("Permission Denied");
-        setTimeout(() => setVoiceStatusMsg(null), 3000);
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setVoiceStatusMsg("Mic permission denied — check Settings > Safari > Microphone");
+      } else if (event.error === 'no-speech') {
+        setVoiceStatusMsg("No speech detected — try again");
+      } else {
+        setVoiceStatusMsg("Voice access failed — retry");
       }
+      setTimeout(() => setVoiceStatusMsg(null), 5000);
     };
 
     recognition.onend = () => setIsListening(false);
