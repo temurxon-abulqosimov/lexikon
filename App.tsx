@@ -37,26 +37,31 @@ const App: React.FC = () => {
     };
   });
 
-  // CRITICAL: Check admin status directly from Telegram WebApp API (not from profile state)
-  const isAdmin = useMemo(() => {
-    // Read directly from Telegram SDK — avoids race condition with profile hydration
+  // Admin check — multiple sources for reliability
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check 1: Immediate check from Telegram WebApp SDK
+  useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const tgUserId = tg?.initDataUnsafe?.user?.id;
-    const tgId = String(tgUserId || profile.telegramId || '');
-    const match = tgId !== '' && tgId === ADMIN_ID;
-    console.log(`[LEX] Admin check: tgUserId="${tgUserId}" profileId="${profile.telegramId}" admin="${ADMIN_ID}" → ${match}`);
-    return match;
+    if (tgUserId) {
+      const match = String(tgUserId) === ADMIN_ID;
+      console.log(`[LEX] Admin (TG SDK): id="${tgUserId}" admin="${ADMIN_ID}" match=${match}`);
+      if (match) setIsAdmin(true);
+    }
+  }, []);
+
+  // Check 2: Re-check after profile hydration from cloud
+  useEffect(() => {
+    if (profile.telegramId) {
+      const match = String(profile.telegramId) === ADMIN_ID;
+      console.log(`[LEX] Admin (profile): id="${profile.telegramId}" admin="${ADMIN_ID}" match=${match}`);
+      if (match) setIsAdmin(true);
+    }
   }, [profile.telegramId]);
 
   // Global iOS Audio Unlock
   useEffect(() => {
-    // Log admin config on mount for debugging
-    const tg = (window as any).Telegram?.WebApp;
-    const tgUserId = tg?.initDataUnsafe?.user?.id;
-    console.log(`[LEX] Admin ID configured: "${ADMIN_ID}"`);
-    console.log(`[LEX] Telegram user ID: "${tgUserId}"`);
-    console.log(`[LEX] Match: ${String(tgUserId) === ADMIN_ID}`);
-
     const handleFirstInteraction = async () => {
       await resumeAudioContext();
       document.removeEventListener('touchstart', handleFirstInteraction);
@@ -285,7 +290,7 @@ const App: React.FC = () => {
               setAutoAudio={setAutoAudio}
               profile={profile}
               history={history}
-              onStartArena={() => { setMode(AppMode.ARENA); triggerHaptic('medium'); }}
+              onStartArena={() => { setMode(AppMode.ARENA); }}
               selectedEntry={activeEntry}
               onEntryClick={handleHistoryItemClick}
             />
