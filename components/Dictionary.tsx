@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Language, LexicalEntry, UserProfile } from '../types';
 import { translateWordCore, enrichLexicalEntry } from '../services/cerebras';
 import { speak, resumeAudioContext } from '../services/tts';
+import { AssemblyAIRecorder, isAssemblyAIAvailable } from '../services/stt';
 import { SEED_ARCHIVE } from '../constants';
 import { fetchGlobalEntry, saveGlobalEntry, fetchSuggestions } from '../services/supabase';
 import ResultCard from './ResultCard';
@@ -71,6 +72,8 @@ const Dictionary: React.FC<Props> = ({
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [voiceStatusMsg, setVoiceStatusMsg] = useState<string | null>(null);
+  const [interimText, setInterimText] = useState('');
+  const sttRef = useRef<AssemblyAIRecorder | null>(null);
   const [result, setResult] = useState<LexicalEntry | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -80,12 +83,21 @@ const Dictionary: React.FC<Props> = ({
   const suggestionRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Silent Feature Detection
+  // Silent Feature Detection — AssemblyAI or fallback
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setVoiceSupported(false);
+    if (!isAssemblyAIAvailable()) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setVoiceSupported(false);
+      }
     }
+  }, []);
+
+  // Cleanup STT recorder on unmount
+  useEffect(() => {
+    return () => {
+      sttRef.current?.destroy();
+    };
   }, []);
 
   useEffect(() => {
@@ -172,9 +184,61 @@ const Dictionary: React.FC<Props> = ({
     }
   };
 
+  const stopVoiceSearch = () => {
+    sttRef.current?.stop();
+    sttRef.current = null;
+    setIsListening(false);
+    setInterimText('');
+  };
+
   const startVoiceSearch = async () => {
     await resumeAudioContext().catch(() => {});
-    
+    setInterimText('');
+
+    // Prefer AssemblyAI if API key is configured
+    if (isAssemblyAIAvailable()) {
+      try {
+        const recorder = new AssemblyAIRecorder({
+          language: sourceLang,
+          onInterim: (text) => {
+            setInterimText(text);
+            setQuery(text);
+          },
+          onFinal: (text) => {
+            setInterimText('');
+            setIsListening(false);
+            setQuery(text);
+            handleSearch(text);
+            sttRef.current = null;
+          },
+          onError: (err) => {
+            console.error("AssemblyAI STT error:", err);
+            setIsListening(false);
+            setInterimText('');
+            setVoiceStatusMsg("Voice error — retry");
+            setTimeout(() => setVoiceStatusMsg(null), 3000);
+            sttRef.current = null;
+          },
+        });
+
+        sttRef.current = recorder;
+        await recorder.start();
+        setIsListening(true);
+        setShowSuggestions(false);
+      } catch (err: any) {
+        console.error("AssemblyAI start failed:", err);
+        setIsListening(false);
+        const msg = err?.message?.includes("denied")
+          ? "Permission Denied"
+          : "Voice access failed";
+        setVoiceStatusMsg(msg);
+        setTimeout(() => setVoiceStatusMsg(null), 3000);
+        sttRef.current = null;
+      }
+      return;
+    }
+
+    // Fallback: browser SpeechRecognition
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
@@ -361,23 +425,29 @@ const Dictionary: React.FC<Props> = ({
               onChange={(e) => setQuery(e.target.value)} 
               onFocus={() => { if (suggestions.length > 0 && !loading && !(result && result.term.toLowerCase() === query.trim().toLowerCase())) setShowSuggestions(true); }}
               onKeyDown={handleKeyDown}
-              placeholder={isListening ? "Listening..." : voiceStatusMsg || "Summon an inscription..."}
+              placeholder={isListening ? (interimText || "Listening...") : voiceStatusMsg || "Summon an inscription..."}
               className={`flex-1 min-w-0 px-6 md:px-10 text-2xl md:text-6xl serif bg-transparent outline-none text-stone-900 lowercase transition-all ${isListening ? 'placeholder:text-[#7c1a1a]/40' : voiceStatusMsg ? 'placeholder:text-[#7c1a1a]' : 'placeholder:text-stone-200'}`} 
             />
             
             <div className="flex flex-shrink-0 items-stretch border-l-2 border-stone-50">
               <button 
                 type="button" 
-                onClick={startVoiceSearch}
+                onClick={isListening ? stopVoiceSearch : startVoiceSearch}
                 className={`px-4 md:px-8 transition-all flex flex-shrink-0 items-center justify-center border-r border-stone-50 ${isListening ? 'text-[#7c1a1a] bg-[#7c1a1a]/5' : !voiceSupported ? 'text-stone-200 cursor-not-allowed' : 'text-stone-400 hover:text-[#7c1a1a]'}`}
               >
                 <div className="relative">
                   {isListening && <div className="absolute -inset-2 border-2 border-[#7c1a1a]/20 rounded-full animate-ping"></div>}
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 md:w-9 md:h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    <line x1="12" x2="12" y1="19" y2="22"/>
-                  </svg>
+                  {isListening ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 md:w-9 md:h-9" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 md:w-9 md:h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                      <line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                  )}
                 </div>
               </button>
 

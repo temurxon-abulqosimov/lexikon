@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => {
         'process.env.CEREBRAS_API_KEY': JSON.stringify(env.CEREBRAS_API_KEY),
         'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY),
         'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
-        'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY)
+        'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
+        'process.env.ASSEMBLYAI_API_KEY': JSON.stringify(env.ASSEMBLYAI_API_KEY)
       },
       resolve: {
         alias: {
