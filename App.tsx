@@ -50,6 +50,13 @@ const App: React.FC = () => {
 
   // Global iOS Audio Unlock
   useEffect(() => {
+    // Log admin config on mount for debugging
+    const tg = (window as any).Telegram?.WebApp;
+    const tgUserId = tg?.initDataUnsafe?.user?.id;
+    console.log(`[LEX] Admin ID configured: "${ADMIN_ID}"`);
+    console.log(`[LEX] Telegram user ID: "${tgUserId}"`);
+    console.log(`[LEX] Match: ${String(tgUserId) === ADMIN_ID}`);
+
     const handleFirstInteraction = async () => {
       await resumeAudioContext();
       document.removeEventListener('touchstart', handleFirstInteraction);
