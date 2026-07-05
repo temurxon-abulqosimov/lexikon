@@ -39,7 +39,12 @@ const App: React.FC = () => {
 
   // CRITICAL: Immediate check against the Telegram Session for Admin ID
   const isAdmin = useMemo(() => {
-    return profile.telegramId === ADMIN_ID;
+    const tgId = String(profile.telegramId || '');
+    const match = tgId === ADMIN_ID || tgId === String(ADMIN_ID);
+    if (tgId && tgId !== '0') {
+      console.log(`[LEX] Admin check: telegramId="${tgId}" vs admin="${ADMIN_ID}" → ${match}`);
+    }
+    return match;
   }, [profile.telegramId]);
 
   // Global iOS Audio Unlock

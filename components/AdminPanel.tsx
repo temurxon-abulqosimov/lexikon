@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { fetchAdminStats } from '../services/supabase';
+import { ADMIN_ID } from '../constants';
 
 interface Stats {
   totalUsers: number;
@@ -187,7 +188,7 @@ const AdminPanel: React.FC = () => {
             </div>
             <div className="flex justify-between border-b border-stone-800 pb-4">
               <span className="text-stone-500 uppercase text-[10px]">Curator ID</span>
-              <span className="text-[#7c1a1a] font-bold">794464667 (Authorized)</span>
+              <span className="text-[#7c1a1a] font-bold">{ADMIN_ID} (Authorized)</span>
             </div>
           </div>
           <div className="mt-16 pt-10 border-t border-stone-800">
