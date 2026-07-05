@@ -37,25 +37,26 @@ const App: React.FC = () => {
     };
   });
 
-  // Admin check — multiple sources for reliability
+  // Admin check — reads directly from Telegram SDK and profile
   const [isAdmin, setIsAdmin] = useState(false);
+  const [debugTgId, setDebugTgId] = useState('');
 
-  // Check 1: Immediate check from Telegram WebApp SDK
+  // Check on mount from Telegram WebApp SDK
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const tgUserId = tg?.initDataUnsafe?.user?.id;
-    if (tgUserId) {
-      const match = String(tgUserId) === ADMIN_ID;
-      console.log(`[LEX] Admin (TG SDK): id="${tgUserId}" admin="${ADMIN_ID}" match=${match}`);
-      if (match) setIsAdmin(true);
-    }
+    const raw = tgUserId !== undefined ? String(tgUserId) : 'N/A';
+    setDebugTgId(raw);
+    const match = tgUserId !== undefined && String(tgUserId) === ADMIN_ID;
+    console.log(`[LEX] Admin check: tgId="${raw}" profileId="${profile.telegramId}" admin="${ADMIN_ID}" match=${match}`);
+    if (match) setIsAdmin(true);
   }, []);
 
-  // Check 2: Re-check after profile hydration from cloud
+  // Re-check when profile hydrates from cloud
   useEffect(() => {
     if (profile.telegramId) {
       const match = String(profile.telegramId) === ADMIN_ID;
-      console.log(`[LEX] Admin (profile): id="${profile.telegramId}" admin="${ADMIN_ID}" match=${match}`);
+      console.log(`[LEX] Admin recheck: profileId="${profile.telegramId}" match=${match}`);
       if (match) setIsAdmin(true);
     }
   }, [profile.telegramId]);
@@ -315,17 +316,17 @@ const App: React.FC = () => {
         <div className="max-w-[1400px] mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] md:text-[12px] uppercase tracking-[0.4em] text-stone-500 font-black">
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
              <div className="flex items-center gap-4 md:gap-6">
-               <span>&copy; 2025 LEXICON PHILOLOGY</span>
-               <span className="text-stone-300 hidden md:block">/</span>
-               <span className={`flex items-center gap-2.5 transition-all duration-500 ${isSyncing ? 'text-[#7c1a1a] animate-pulse' : 'text-stone-500'}`}>
-                 <span className={`w-2.5 h-2.5 rounded-full ${isSyncing ? 'bg-[#7c1a1a]' : cloudActive ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-stone-300'}`} />
-                 {isSyncing ? 'Syncing...' : cloudActive ? 'Cloud Active' : 'Unverified Scribe'}
-               </span>
+                <span>&copy; 2025 LEXICON PHILOLOGY</span>
+                <span className="text-stone-300 hidden md:block">/</span>
+                <span className={`flex items-center gap-2.5 transition-all duration-500 ${isSyncing ? 'text-[#7c1a1a] animate-pulse' : 'text-stone-500'}`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${isSyncing ? 'bg-[#7c1a1a]' : cloudActive ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-stone-300'}`} />
+                  {isSyncing ? 'Syncing...' : cloudActive ? 'Cloud Active' : 'Unverified Scribe'}
+                </span>
              </div>
           </div>
           <div className="flex items-center gap-6 md:gap-10 overflow-x-auto w-full md:w-auto justify-center md:justify-end">
              <span className="flex items-center gap-3 whitespace-nowrap">
-              <span className={`w-2.5 h-2.5 rounded-full ${cloudActive ? 'bg-green-500' : 'bg-stone-300'}`}></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${isAdmin ? 'bg-yellow-500' : 'bg-stone-300'}`}></span>
               {profile.rank}
             </span>
             <span className="text-stone-900 whitespace-nowrap">LVL {Math.floor(profile.xp / 1000) + 1}</span>
@@ -333,6 +334,11 @@ const App: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Admin Debug — always visible in footer */}
+      <div className="max-w-[1400px] mx-auto px-6 pb-6 text-[8px] font-mono text-stone-300 text-center tracking-normal normal-case space-y-1">
+        <div>ADMIN_ID={ADMIN_ID} isAdmin={String(isAdmin)} tgId={debugTgId}</div>
+      </div>
     </div>
   );
 };
