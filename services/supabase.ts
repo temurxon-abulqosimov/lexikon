@@ -34,7 +34,14 @@ export async function fetchAdminUsers() {
       .select('username, first_name, last_name, telegram_id, updated_at')
       .order('updated_at', { ascending: false });
 
-    if (!profileError && profileData?.length) {
+    if (profileError) {
+      console.warn(`[fetchAdminUsers] lex_profiles error:`, profileError);
+      if (!handleSupabaseError(profileError, 'lex_profiles')) {
+        return [];
+      }
+    }
+
+    if (profileData && profileData.length > 0) {
       return profileData.map(p => ({
         username: p.username,
         first_name: p.first_name || p.username || 'Scholar',
@@ -44,20 +51,21 @@ export async function fetchAdminUsers() {
     }
 
     // 2. Fallback to `users` table
+    console.warn('[fetchAdminUsers] lex_profiles empty/missing, trying users table');
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select('username, first_name, last_name, created_at')
       .order('created_at', { ascending: false });
 
-    if (!usersError) return usersData || [];
-
-    if (handleSupabaseError(usersError, 'users')) {
+    if (usersError) {
+      console.warn(`[fetchAdminUsers] users error:`, usersError);
+      handleSupabaseError(usersError, 'users');
       return [];
     }
 
-    return [];
+    return usersData || [];
   } catch (err) {
-    console.error("User Fetch Failed:", err);
+    console.error("[fetchAdminUsers] Failed:", err);
     return [];
   }
 }
