@@ -21,7 +21,7 @@ export const RANKS = [
 ];
 
 export const APP_ACCENT = '#7c1a1a';
-export const ADMIN_ID = 794464667;
+export const ADMIN_ID = Number(process.env.ADMIN_TELEGRAM_ID) || 794464667;
 
 // Tier 0: Static Seed Manifest for instant hits on common words
 export const SEED_ARCHIVE: Partial<Record<string, Partial<LexicalEntry>>> = {
