@@ -1,0 +1,8 @@
+{
+  "name": "UzGer Lexicon (LEX.)",
+  "description": "A sophisticated, scholarly translation engine supporting German, Uzbek, English, Russian, and Arabic with CEFR tracking and literary context.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

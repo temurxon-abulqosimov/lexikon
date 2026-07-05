@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* iOS Safe Area Utilities */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: #fcfcfb; }
+::-webkit-scrollbar-thumb { background: #eee; }
+::-webkit-scrollbar-thumb:hover { background: #7c1a1a; }
+
+/* Hardware-accelerated GPU layer */
+.ios-gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Smooth momentum scrolling on iOS */
+body {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Accent utilities */
+.accent-bg { background-color: #7c1a1a; }
+.accent-text { color: #7c1a1a; }
+.accent-border { border-color: #7c1a1a; }
