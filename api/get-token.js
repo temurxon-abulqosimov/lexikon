@@ -1,7 +1,6 @@
 const ASSEMBLYAI_BASE = "https://api.assemblyai.com/v2";
 
-export default async function handler(req: any, res: any) {
-  // CORS headers
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -16,7 +15,7 @@ export default async function handler(req: any, res: any) {
 
   const apiKey = process.env.ASSEMBLYAI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "ASSEMBLYAI_API_KEY not configured on server" });
+    return res.status(500).json({ error: "ASSEMBLYAI_API_KEY not configured" });
   }
 
   try {
@@ -36,7 +35,7 @@ export default async function handler(req: any, res: any) {
 
     const data = await upstream.json();
     return res.status(200).json({ token: data.token });
-  } catch (err: any) {
-    return res.status(500).json({ error: err?.message || "Token fetch failed" });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Token fetch failed" });
   }
 }
