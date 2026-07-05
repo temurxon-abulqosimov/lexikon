@@ -39,14 +39,12 @@ const App: React.FC = () => {
 
   // Admin check — reads directly from Telegram SDK and profile
   const [isAdmin, setIsAdmin] = useState(false);
-  const [debugTgId, setDebugTgId] = useState('');
 
   // Check on mount from Telegram WebApp SDK
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const tgUserId = tg?.initDataUnsafe?.user?.id;
     const raw = tgUserId !== undefined ? String(tgUserId) : 'N/A';
-    setDebugTgId(raw);
     const match = tgUserId !== undefined && String(tgUserId) === ADMIN_ID;
     console.log(`[LEX] Admin check: tgId="${raw}" profileId="${profile.telegramId}" admin="${ADMIN_ID}" match=${match}`);
     if (match) setIsAdmin(true);
@@ -335,10 +333,6 @@ const App: React.FC = () => {
         </div>
       </footer>
 
-      {/* Admin Debug — always visible in footer */}
-      <div className="max-w-[1400px] mx-auto px-6 pb-6 text-[8px] font-mono text-stone-300 text-center tracking-normal normal-case space-y-1">
-        <div>ADMIN_ID={ADMIN_ID} isAdmin={String(isAdmin)} tgId={debugTgId}</div>
-      </div>
     </div>
   );
 };

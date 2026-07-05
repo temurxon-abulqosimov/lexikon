@@ -150,8 +150,8 @@ const AdminPanel: React.FC = () => {
              {stats?.users.map((u, i) => (
                <div key={i} className="p-6 flex items-center justify-between group hover:bg-stone-50 transition-colors">
                  <div>
-                   <p className="serif text-xl font-bold text-stone-900">{u.first_name || 'Anonymous Scholar'}</p>
-                   <p className="text-[9px] uppercase tracking-widest text-[#7c1a1a] font-bold mt-1">@{u.username || 'unknown'}</p>
+                    <p className="serif text-xl font-bold text-stone-900">{u.first_name || 'Anonymous'} {u.last_name || ''}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-[#7c1a1a] font-bold mt-1">{u.username ? `@${u.username}` : ''}</p>
                  </div>
                  <span className="text-[9px] font-mono text-stone-300">
                    {new Date(u.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}

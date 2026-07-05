@@ -31,7 +31,7 @@ export async function fetchAdminUsers() {
     // 1. Try to fetch from the specific 'users' table
     const { data: usersData, error: usersError } = await supabase
       .from('users')
-      .select('username, first_name, created_at')
+      .select('username, first_name, last_name, created_at')
       .order('created_at', { ascending: false });
     
     if (!usersError) return usersData || [];
@@ -40,7 +40,7 @@ export async function fetchAdminUsers() {
     if (handleSupabaseError(usersError, 'users')) {
       const { data: profileData, error: profileError } = await supabase
         .from('lex_profiles')
-        .select('username, updated_at')
+        .select('username, first_name, last_name, updated_at')
         .order('updated_at', { ascending: false });
       
       if (profileError) {
@@ -51,7 +51,8 @@ export async function fetchAdminUsers() {
       // Map profiles to a similar structure for the UI
       return (profileData || []).map(p => ({
         username: p.username,
-        first_name: p.username || 'Scholar',
+        first_name: p.first_name || p.username || 'Scholar',
+        last_name: p.last_name || '',
         created_at: p.updated_at
       }));
     }
