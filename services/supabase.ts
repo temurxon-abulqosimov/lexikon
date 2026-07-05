@@ -28,33 +28,31 @@ const handleSupabaseError = (error: any, tableName: string) => {
  */
 export async function fetchAdminUsers() {
   try {
-    // 1. Try to fetch from the specific 'users' table
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('username, first_name, last_name, created_at')
-      .order('created_at', { ascending: false });
-    
-    if (!usersError) return usersData || [];
+    // 1. Try `lex_profiles` first (primary user registry)
+    const { data: profileData, error: profileError } = await supabase
+      .from('lex_profiles')
+      .select('username, first_name, last_name, telegram_id, updated_at')
+      .order('updated_at', { ascending: false });
 
-    // 2. Fallback to 'lex_profiles' if 'users' table is missing (404)
-    if (handleSupabaseError(usersError, 'users')) {
-      const { data: profileData, error: profileError } = await supabase
-        .from('lex_profiles')
-        .select('username, first_name, last_name, updated_at')
-        .order('updated_at', { ascending: false });
-      
-      if (profileError) {
-        handleSupabaseError(profileError, 'lex_profiles');
-        return [];
-      }
-      
-      // Map profiles to a similar structure for the UI
-      return (profileData || []).map(p => ({
+    if (!profileError && profileData?.length) {
+      return profileData.map(p => ({
         username: p.username,
         first_name: p.first_name || p.username || 'Scholar',
         last_name: p.last_name || '',
         created_at: p.updated_at
       }));
+    }
+
+    // 2. Fallback to `users` table
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('username, first_name, last_name, created_at')
+      .order('created_at', { ascending: false });
+
+    if (!usersError) return usersData || [];
+
+    if (handleSupabaseError(usersError, 'users')) {
+      return [];
     }
 
     return [];
