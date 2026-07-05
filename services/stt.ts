@@ -10,6 +10,8 @@ const LANG_MAP: Partial<Record<Language, string>> = {
   German: "de",
   English: "en",
   Russian: "ru",
+  Arabic: "ar",
+  // Uzbek not supported by AssemblyAI — will auto-detect
 };
 
 interface STTOptions {
@@ -61,7 +63,6 @@ export class AssemblyAIRecorder {
   async requestMicPermission(): Promise<MediaStream> {
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        sampleRate: SAMPLE_RATE,
         channelCount: CHANNELS,
         echoCancellation: true,
         noiseSuppression: true,
@@ -79,7 +80,6 @@ export class AssemblyAIRecorder {
     } else if (!this.mediaStream) {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: SAMPLE_RATE,
           channelCount: CHANNELS,
           echoCancellation: true,
           noiseSuppression: true,
@@ -95,9 +95,10 @@ export class AssemblyAIRecorder {
       throw new Error(`AUTH_FAILED: ${e?.message || "Token fetch failed"}`);
     }
 
-    // Step 2: Create AudioContext
+    // Step 2: Create AudioContext (use mic's native sample rate)
     try {
-      this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const micRate = this.mediaStream.getAudioTracks()[0]?.getSettings().sampleRate || 48000;
+      this.audioContext = new AudioContext({ sampleRate: micRate });
       if (this.audioContext.state === "suspended") {
         await this.audioContext.resume();
       }
@@ -111,19 +112,40 @@ export class AssemblyAIRecorder {
     } catch {
       // Fallback: inline worklet via Blob URL
       try {
+        const micRate = this.mediaStream?.getAudioTracks()[0]?.getSettings().sampleRate || 48000;
+        const resampleRatio = micRate / SAMPLE_RATE;
         const blob = new Blob(
           [
             `
             class AudioProcessor extends AudioWorkletProcessor {
               _buffer = new Float32Array(0);
               _chunkSize = ${CHUNK_SIZE};
+              _resampleRatio = ${resampleRatio};
               process(inputs) {
                 const input = inputs[0];
                 if (!input || !input[0]) return true;
                 const mono = input[0];
-                const newBuf = new Float32Array(this._buffer.length + mono.length);
+
+                // Resample if mic rate differs from target rate
+                let resampled;
+                if (this._resampleRatio !== 1) {
+                  const outLen = Math.floor(mono.length / this._resampleRatio);
+                  resampled = new Float32Array(outLen);
+                  for (let i = 0; i < outLen; i++) {
+                    const srcIdx = i * this._resampleRatio;
+                    const idx = Math.floor(srcIdx);
+                    const frac = srcIdx - idx;
+                    resampled[i] = idx + 1 < mono.length
+                      ? mono[idx] * (1 - frac) + mono[idx + 1] * frac
+                      : mono[idx];
+                  }
+                } else {
+                  resampled = mono;
+                }
+
+                const newBuf = new Float32Array(this._buffer.length + resampled.length);
                 newBuf.set(this._buffer);
-                newBuf.set(mono, this._buffer.length);
+                newBuf.set(resampled, this._buffer.length);
                 this._buffer = newBuf;
                 while (this._buffer.length >= this._chunkSize) {
                   const chunk = this._buffer.slice(0, this._chunkSize);

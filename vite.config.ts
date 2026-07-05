@@ -17,8 +17,7 @@ export default defineConfig(({ mode }) => {
         'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY),
         'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
         'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
-        'process.env.ELEVENLABS_API_KEY': JSON.stringify(env.ELEVENLABS_API_KEY),
-        'process.env.ADMIN_TELEGRAM_ID': JSON.stringify(env.ADMIN_TELEGRAM_ID)
+        'process.env.ELEVENLABS_API_KEY': JSON.stringify(env.ELEVENLABS_API_KEY)
       },
       resolve: {
         alias: {

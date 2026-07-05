@@ -21,8 +21,8 @@ export const RANKS = [
 ];
 
 export const APP_ACCENT = '#7c1a1a';
-// Admin Telegram ID — set ADMIN_TELEGRAM_ID in Vercel env vars to override
-export const ADMIN_ID: string = (process.env.ADMIN_TELEGRAM_ID as string) || '794464667';
+// Admin Telegram ID — set VITE_ADMIN_TELEGRAM_ID in Vercel env vars
+export const ADMIN_ID: string = (import.meta as any).env?.VITE_ADMIN_TELEGRAM_ID || '794464667';
 
 // Tier 0: Static Seed Manifest for instant hits on common words
 export const SEED_ARCHIVE: Partial<Record<string, Partial<LexicalEntry>>> = {
