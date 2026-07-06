@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-ai/deepseek-v4-flash",
+        model: "google/gemma-4-31b-it",
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 0.95,
