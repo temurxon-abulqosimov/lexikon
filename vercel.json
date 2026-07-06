@@ -6,6 +6,9 @@
   "functions": {
     "api/get-token.js": {
       "maxDuration": 10
+    },
+    "api/nvidia.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

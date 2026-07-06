@@ -1,8 +1,7 @@
 
 import { Language, LexicalEntry } from "../types";
 
-const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+const PROXY_URL = "/api/nvidia";
 
 const generateId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -28,22 +27,18 @@ async function openrouterRequest<T>(
   userPrompt: string,
   retries = 1
 ): Promise<T> {
-  const apiKey = process.env.NVIDIA_API_KEY || "";
-
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) {
       await new Promise(r => setTimeout(r, 1500 * attempt));
     }
 
-    const response = await fetch(NVIDIA_API_URL, {
+    const response = await fetch(PROXY_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
