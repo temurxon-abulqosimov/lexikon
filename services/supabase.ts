@@ -160,7 +160,7 @@ export async function fetchGlobalEntry(
 
 export async function saveGlobalEntry(entry: LexicalEntry) {
   try {
-    await supabase
+    const { error } = await supabase
       .from('lex_entries')
       .upsert({
         term: entry.term,
@@ -170,7 +170,10 @@ export async function saveGlobalEntry(entry: LexicalEntry) {
         entry_data: entry,
         created_at: new Date().toISOString()
       }, { onConflict: 'normalized_term,source_lang,target_lang' });
-  } catch {}
+    if (error) handleSupabaseError(error, 'lex_entries');
+  } catch (err) {
+    console.warn("[saveGlobalEntry] Failed:", err);
+  }
 }
 
 export async function fetchProfile(telegramId: number): Promise<UserProfile | null> {

@@ -26,46 +26,61 @@ function shuffleArray<T>(array: T[]): T[] {
  */
 async function openrouterRequest<T>(
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  retries = 1
 ): Promise<T> {
   const apiKey = process.env.OPENROUTER_API_KEY || "";
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "https://uzger-lexicon.app",
-      "X-Title": "Uzger Lexicon",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1500,
-    }),
-  });
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} – ${errText}`);
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "https://uzger-lexicon.app",
+        "X-Title": "Uzger Lexicon",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1500,
+      }),
+    });
+
+    if (response.status === 429 && attempt < retries) {
+      console.warn(`[LEX] Rate limited, retrying (${attempt + 1}/${retries})...`);
+      lastError = new Error(`Rate limited (429)`);
+      continue;
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenRouter API error: ${response.status} – ${errText}`);
+    }
+
+    const data = await response.json();
+    const rawContent: string = data.choices?.[0]?.message?.content ?? "{}";
+
+    const cleaned = rawContent.replace(/```(?:json)?\s*([\s\S]*?)```/i, "$1").trim();
+
+    try {
+      return JSON.parse(cleaned) as T;
+    } catch (e) {
+      console.error("OpenRouter JSON parse failed. Raw:", rawContent);
+      throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+    }
   }
 
-  const data = await response.json();
-  const rawContent: string = data.choices?.[0]?.message?.content ?? "{}";
-
-  // Strip any accidental markdown fences GPT sometimes adds
-  const cleaned = rawContent.replace(/```(?:json)?\s*([\s\S]*?)```/i, "$1").trim();
-
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch (e) {
-    console.error("OpenRouter JSON parse failed. Raw:", rawContent);
-    throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
-  }
+  throw lastError || new Error("Request failed after retries");
 }
 
 /**

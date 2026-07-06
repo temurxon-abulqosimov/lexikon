@@ -356,9 +356,19 @@ const Dictionary: React.FC<Props> = ({
       saveGlobalEntry(fullEntry);
 
     } catch (err: any) {
-      const errorMsg = (typeof err !== 'undefined' && err?.message?.includes('process')) 
-        ? "Environment link severed. API access failed." 
-        : "The archive is silent. Network or API error occurred.";
+      const rawMsg = err?.message || String(err);
+      console.error("Search failed:", rawMsg);
+
+      let errorMsg: string;
+      if (rawMsg.includes('429') || rawMsg.toLowerCase().includes('rate limit')) {
+        errorMsg = "Too many requests — wait a moment and try again.";
+      } else if (rawMsg.includes('401') || rawMsg.includes('403') || rawMsg.includes('process')) {
+        errorMsg = "API key invalid. Check OpenRouter configuration.";
+      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
+        errorMsg = "Network unreachable. Check your connection.";
+      } else {
+        errorMsg = `The archive is silent. ${rawMsg}`;
+      }
       setSearchError(errorMsg);
       setLoading(false);
     }
