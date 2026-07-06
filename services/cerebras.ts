@@ -135,6 +135,86 @@ Return a JSON object with these fields:
 }
 
 /**
+ * Combined translation + enrichment in a single API call.
+ */
+export async function translateAndEnrich(
+  query: string,
+  sourceLanguage: Language,
+  targetLanguage: Language
+): Promise<LexicalEntry> {
+  const systemPrompt =
+    "Output ONLY a valid JSON object. No text, no markdown, no explanation, no thinking. Just the raw JSON object starting with { and ending with }.";
+
+  const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage} and provide full philological analysis.
+
+IMPORTANT LANGUAGE RULES:
+- "synonyms" MUST be in ${sourceLanguage} only
+- "variations" MUST be in ${targetLanguage} only
+- "literature" and "idioms" MUST be in ${sourceLanguage}
+
+Return a JSON object with ALL of these fields:
+- "term": the original word/phrase
+- "mainTranslation": the primary translation
+- "partOfSpeech": grammatical category
+- "gender": gender if German (m/f/n), otherwise omit
+- "plural": plural form if German, otherwise omit
+- "cefrLevel": CEFR level (A1–C2) for non-Uzbek source, otherwise omit
+- "etymology": origin/etymology string (in English)
+- "synonyms": array of 3 synonyms in ${sourceLanguage}
+- "variations": array of 3 variations in ${targetLanguage}, each: { "text", "confidence" (0.0–1.0) }
+- "literature": array of 2 concise quotes (max 15 words, in ${sourceLanguage}), each: { "text", "translation" (in ${targetLanguage}), "source", "author" }
+- "idioms": array of 2 natural sentences in ${sourceLanguage}, each: { "text", "translation" (in ${targetLanguage}), "context" }`;
+
+  const raw = await openrouterRequest<any>(systemPrompt, userPrompt);
+
+  const normalizedVariations = (raw.variations || []).map((v: any) => ({
+    text: v.text || v.term || "",
+    confidence: typeof v.confidence === "number" ? v.confidence : 0.90,
+    source: "ai" as const,
+  }));
+
+  const normalizedLiterature = (raw.literature || []).map((lit: any) => ({
+    text: lit.text || lit.quote || "",
+    translation: lit.translation || "",
+    source: lit.source || "Literary archive",
+    author: lit.author || "Anonymous",
+  }));
+
+  const normalizedIdioms = (raw.idioms || []).map((id: any) => ({
+    text: id.text || id.sentence || "",
+    translation: id.translation || "",
+    context: id.context || "Colloquial usage",
+  }));
+
+  return {
+    id: generateId(),
+    term: raw.term || query,
+    normalizedTerm: query.toLowerCase().trim(),
+    mainTranslation: raw.mainTranslation,
+    sourceLang: sourceLanguage,
+    targetLang: targetLanguage,
+    cefrLevel: sourceLanguage !== "Uzbek" ? raw.cefrLevel : undefined,
+    philology: {
+      etymology: raw.etymology || "",
+      partOfSpeech: raw.partOfSpeech,
+      gender: raw.gender,
+      plural: raw.plural,
+    },
+    culture: {
+      usage: raw.usage || "Standard scholarly use",
+      register: "neutral",
+      notes: "",
+    },
+    synonyms: raw.synonyms || [],
+    variations: normalizedVariations,
+    literature: normalizedLiterature,
+    realLifeSentences: normalizedIdioms,
+    idioms: normalizedIdioms,
+    timestamp: Date.now(),
+  };
+}
+
+/**
  * PHASE 2: Comprehensive Archival Enrichment
  */
 export async function enrichLexicalEntry(

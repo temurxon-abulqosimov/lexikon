@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Language, LexicalEntry, UserProfile } from '../types';
-import { translateWordCore, enrichLexicalEntry } from '../services/cerebras';
+import { translateWordCore, translateAndEnrich } from '../services/cerebras';
 import { speak, resumeAudioContext } from '../services/tts';
 import { AssemblyAIRecorder, isAssemblyAIAvailable } from '../services/stt';
 import { SEED_ARCHIVE } from '../constants';
@@ -338,20 +338,16 @@ const Dictionary: React.FC<Props> = ({
         return;
       }
 
-      const coreEntry = await translateWordCore(cleanQuery, sourceLang, targetLang);
-      coreEntry.normalizedTerm = normQuery;
+      const fullEntry = await translateAndEnrich(cleanQuery, sourceLang, targetLang);
+      fullEntry.normalizedTerm = normQuery;
       
-      setResult(coreEntry);
+      setResult(fullEntry);
       setLoading(false);
 
       if (autoAudio) {
-        speak(cleanQuery, sourceLang).then(() => speak(coreEntry.mainTranslation, targetLang)).catch(() => {});
+        speak(cleanQuery, sourceLang).then(() => speak(fullEntry.mainTranslation, targetLang)).catch(() => {});
       }
 
-      const enrichment = await enrichLexicalEntry(coreEntry);
-      const fullEntry = { ...coreEntry, ...enrichment };
-      
-      setResult(fullEntry);
       onEntrySaved(fullEntry);
       saveGlobalEntry(fullEntry);
 
