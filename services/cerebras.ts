@@ -166,7 +166,7 @@ Return a JSON object with ALL of these fields:
 - "literature": array of 2 concise quotes (max 15 words, in ${sourceLanguage}), each: { "text", "translation" (in ${targetLanguage}), "source", "author" }
 - "idioms": array of 2 natural sentences in ${sourceLanguage}, each: { "text", "translation" (in ${targetLanguage}), "context" }`;
 
-  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 4096);
+  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 8192);
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
     text: v.text || v.term || "",
