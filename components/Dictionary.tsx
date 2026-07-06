@@ -363,7 +363,7 @@ const Dictionary: React.FC<Props> = ({
       if (rawMsg.includes('429') || rawMsg.toLowerCase().includes('rate limit')) {
         errorMsg = "Too many requests — wait a moment and try again.";
       } else if (rawMsg.includes('401') || rawMsg.includes('403') || rawMsg.includes('process')) {
-        errorMsg = "API key invalid. Check OpenRouter configuration.";
+        errorMsg = "API key invalid. Check NVIDIA API configuration.";
       } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
         errorMsg = "Network unreachable. Check your connection.";
       } else {

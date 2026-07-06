@@ -1,8 +1,8 @@
 
 import { Language, LexicalEntry } from "../types";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = "openai/gpt-4o";
+const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
 
 const generateId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -21,15 +21,14 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Core fetch helper for OpenRouter.
- * Uses plain fetch() for maximum iOS WebKit compatibility — no SDK required.
+ * Core fetch helper for NVIDIA Nemotron API (OpenAI-compatible).
  */
 async function openrouterRequest<T>(
   systemPrompt: string,
   userPrompt: string,
   retries = 1
 ): Promise<T> {
-  const apiKey = process.env.OPENROUTER_API_KEY || "";
+  const apiKey = process.env.NVIDIA_API_KEY || "";
 
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -37,13 +36,11 @@ async function openrouterRequest<T>(
       await new Promise(r => setTimeout(r, 1500 * attempt));
     }
 
-    const response = await fetch(OPENROUTER_API_URL, {
+    const response = await fetch(NVIDIA_API_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "https://uzger-lexicon.app",
-        "X-Title": "Uzger Lexicon",
       },
       body: JSON.stringify({
         model: MODEL,
@@ -51,8 +48,11 @@ async function openrouterRequest<T>(
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        response_format: { type: "json_object" },
-        max_tokens: 1500,
+        temperature: 1,
+        top_p: 0.95,
+        max_tokens: 1024,
+        chat_template_kwargs: { enable_thinking: true },
+        reasoning_budget: 2048,
       }),
     });
 
@@ -64,7 +64,7 @@ async function openrouterRequest<T>(
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} – ${errText}`);
+      throw new Error(`NVIDIA API error: ${response.status} – ${errText}`);
     }
 
     const data = await response.json();
@@ -75,7 +75,7 @@ async function openrouterRequest<T>(
     try {
       return JSON.parse(cleaned) as T;
     } catch (e) {
-      console.error("OpenRouter JSON parse failed. Raw:", rawContent);
+      console.error("JSON parse failed. Raw:", rawContent);
       throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
     }
   }

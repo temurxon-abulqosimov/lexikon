@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.CEREBRAS_API_KEY': JSON.stringify(env.CEREBRAS_API_KEY),
         'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY),
+        'process.env.NVIDIA_API_KEY': JSON.stringify(env.NVIDIA_API_KEY),
         'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
         'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
         'process.env.ELEVENLABS_API_KEY': JSON.stringify(env.ELEVENLABS_API_KEY)
