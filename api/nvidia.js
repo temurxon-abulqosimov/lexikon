@@ -28,13 +28,11 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        model: "deepseek-ai/deepseek-v4-flash",
         messages,
-        temperature: temperature ?? 0.6,
+        temperature: temperature ?? 1,
         top_p: top_p ?? 0.95,
         max_tokens: max_tokens ?? 1024,
-        frequency_penalty: 0,
-        presence_penalty: 0,
       }),
     });
 

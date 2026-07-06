@@ -43,7 +43,7 @@ async function openrouterRequest<T>(
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.6,
+        temperature: 1,
         top_p: 0.95,
         max_tokens: 1024,
       }),
