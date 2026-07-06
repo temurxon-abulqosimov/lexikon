@@ -43,11 +43,9 @@ async function openrouterRequest<T>(
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 1,
+        temperature: 0.6,
         top_p: 0.95,
         max_tokens: 1024,
-        chat_template_kwargs: { enable_thinking: true },
-        reasoning_budget: 2048,
       }),
     });
 

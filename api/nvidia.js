@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, temperature, top_p, max_tokens, chat_template_kwargs, reasoning_budget } = req.body;
+    const { messages, temperature, top_p, max_tokens } = req.body;
 
     const upstream = await fetch(NVIDIA_API_URL, {
       method: "POST",
@@ -28,13 +28,13 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b",
+        model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
         messages,
-        temperature: temperature ?? 1,
+        temperature: temperature ?? 0.6,
         top_p: top_p ?? 0.95,
         max_tokens: max_tokens ?? 1024,
-        chat_template_kwargs: chat_template_kwargs ?? { enable_thinking: true },
-        reasoning_budget: reasoning_budget ?? 2048,
+        frequency_penalty: 0,
+        presence_penalty: 0,
       }),
     });
 
