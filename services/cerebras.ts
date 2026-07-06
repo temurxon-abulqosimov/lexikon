@@ -44,7 +44,7 @@ async function openrouterRequest<T>(
           { role: "user", content: userPrompt },
         ],
         temperature: 1,
-        top_p: 0.95,
+        top_p: 1,
         max_tokens: 512,
       }),
     });

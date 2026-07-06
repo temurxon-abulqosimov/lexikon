@@ -28,11 +28,12 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it",
+        model: "nvidia/nemotron-3-nano-30b-a3b",
         messages,
         temperature: temperature ?? 1,
-        top_p: top_p ?? 0.95,
-        max_tokens: max_tokens ?? 1024,
+        top_p: top_p ?? 1,
+        max_tokens: max_tokens ?? 512,
+        stream: true,
       }),
     });
 
@@ -41,8 +42,41 @@ export default async function handler(req, res) {
       return res.status(upstream.status).json({ error: errText });
     }
 
-    const data = await upstream.json();
-    return res.status(200).json(data);
+    // Stream SSE from NVIDIA directly to client
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+
+    let fullContent = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+
+      // Parse SSE chunks and accumulate content
+      const lines = chunk.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) fullContent += content;
+          } catch {}
+        }
+      }
+    }
+
+    // Send final assembled JSON (non-streaming format for client compatibility)
+    return res.status(200).json({
+      choices: [{ message: { content: fullContent, role: "assistant" } }],
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message || "NVIDIA API request failed" });
   }
