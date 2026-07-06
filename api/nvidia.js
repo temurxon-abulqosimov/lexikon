@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 1,
-        max_tokens: max_tokens ?? 512,
+        max_tokens: max_tokens ?? 2048,
         stream: true,
       }),
     });

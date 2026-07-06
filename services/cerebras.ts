@@ -45,7 +45,7 @@ async function openrouterRequest<T>(
         ],
         temperature: 1,
         top_p: 1,
-        max_tokens: 512,
+        max_tokens: 2048,
       }),
     });
 
