@@ -63,7 +63,18 @@ async function openrouterRequest<T>(
     const data = await response.json();
     const rawContent: string = data.choices?.[0]?.message?.content ?? "{}";
 
-    const cleaned = rawContent.replace(/```(?:json)?\s*([\s\S]*?)```/i, "$1").trim();
+    // Extract JSON from possible markdown fences or mixed content
+    let cleaned = rawContent.trim();
+    const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim();
+    } else {
+      // Try to find raw JSON object in the response
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[0];
+      }
+    }
 
     try {
       return JSON.parse(cleaned) as T;
@@ -86,7 +97,7 @@ export async function translateWordCore(
   targetLanguage: Language
 ): Promise<LexicalEntry> {
   const systemPrompt =
-    "You are a scholarly philologist providing concise lexical data in JSON format. Always respond with valid JSON only, no markdown.";
+    "Output ONLY a valid JSON object. No text, no markdown, no explanation, no thinking. Just the raw JSON object starting with { and ending with }.";
 
   const userPrompt = `Translate "${query}" (${sourceLanguage} → ${targetLanguage}).
 Return a JSON object with these fields:
@@ -130,7 +141,7 @@ export async function enrichLexicalEntry(
   entry: LexicalEntry
 ): Promise<Partial<LexicalEntry>> {
   const systemPrompt =
-    "You are a deep-learning philologist providing structured linguistic data in JSON format. Always respond with valid JSON only, no markdown.";
+    "Output ONLY a valid JSON object. No text, no markdown, no explanation, no thinking. Just the raw JSON object starting with { and ending with }.";
 
   const userPrompt = `Detailed philological analysis for "${entry.term}".
 Source language (original word): ${entry.sourceLang}
@@ -197,7 +208,7 @@ Return a JSON object with:
  * Scholarly Daily Insight
  */
 export async function getDailyInsight() {
-  const systemPrompt = "You are a linguistic historian. Always respond with valid JSON only, no markdown.";
+  const systemPrompt = "Output ONLY a valid JSON object. No text, no markdown, no explanation. Just the raw JSON.";
   const userPrompt =
     "Generate a sophisticated 'Linguistic Fact of the Day' about the intersection of German, Uzbek, Arabic, or Russian. Return a JSON object with fields: title, fact, source.";
 
@@ -214,7 +225,7 @@ export async function getDailyInsight() {
 export async function generateQuiz(entries: LexicalEntry[]) {
   const context = entries.map((e) => `${e.term} ↔ ${e.mainTranslation}`).join(", ");
 
-  const systemPrompt = "You are a language teacher. Always respond with valid JSON only, no markdown.";
+  const systemPrompt = "Output ONLY a valid JSON object. No text, no markdown, no explanation. Just the raw JSON.";
   const userPrompt = `Create a 3-option multiple-choice quiz based on these terms: ${context}.
 Return a JSON object with a "questions" key containing an array of objects.
 Each object must have: question, correctAnswer, options (array of 3 strings), explanation.`;
