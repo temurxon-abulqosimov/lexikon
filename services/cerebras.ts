@@ -25,7 +25,8 @@ function shuffleArray<T>(array: T[]): T[] {
 async function openrouterRequest<T>(
   systemPrompt: string,
   userPrompt: string,
-  retries = 1
+  retries = 1,
+  maxTokens = 2048
 ): Promise<T> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -45,7 +46,7 @@ async function openrouterRequest<T>(
         ],
         temperature: 1,
         top_p: 1,
-        max_tokens: 2048,
+        max_tokens: maxTokens,
       }),
     });
 
@@ -165,7 +166,7 @@ Return a JSON object with ALL of these fields:
 - "literature": array of 2 concise quotes (max 15 words, in ${sourceLanguage}), each: { "text", "translation" (in ${targetLanguage}), "source", "author" }
 - "idioms": array of 2 natural sentences in ${sourceLanguage}, each: { "text", "translation" (in ${targetLanguage}), "context" }`;
 
-  const raw = await openrouterRequest<any>(systemPrompt, userPrompt);
+  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 4096);
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
     text: v.text || v.term || "",
