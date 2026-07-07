@@ -32,11 +32,11 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "nvidia/nemotron-mini-4b-instruct",
+        model: model || "openai/gpt-oss-120b",
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 1,
-        max_tokens: max_tokens ?? 8192,
+        max_tokens: max_tokens ?? 16384,
         stream: true,
       }),
     });

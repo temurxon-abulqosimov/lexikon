@@ -151,7 +151,7 @@ export async function translateAndEnrich(
   const userPrompt = `Translate "${query}" (${sourceLanguage}→${targetLanguage}). Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}.
 JSON:{"term":"","mainTranslation":"","partOfSpeech":"","gender":"","plural":"","cefrLevel":"","etymology":"","synonyms":["3 in ${sourceLanguage}"],"variations":[{"text":"in ${targetLanguage}","confidence":0.9}],"idioms":[{"text":"in ${sourceLanguage}","translation":"in ${targetLanguage}","context":""}]}`;
 
-  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 2048);
+  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 16384);
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
     text: v.text || v.term || "",
