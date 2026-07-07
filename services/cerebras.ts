@@ -26,7 +26,8 @@ async function openrouterRequest<T>(
   systemPrompt: string,
   userPrompt: string,
   retries = 1,
-  maxTokens = 2048
+  maxTokens = 2048,
+  model?: string
 ): Promise<T> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -47,6 +48,7 @@ async function openrouterRequest<T>(
         temperature: 1,
         top_p: 1,
         max_tokens: maxTokens,
+        ...(model ? { model } : {}),
       }),
     });
 
@@ -242,7 +244,7 @@ Return a JSON object with:
 5. "idioms": array of 2 natural sentences in ${entry.sourceLang} with translations in ${entry.targetLang} — each object: { "text" (sentence in ${entry.sourceLang}), "translation" (in ${entry.targetLang}), "context" }`;
 
   try {
-    const raw = await openrouterRequest<any>(systemPrompt, userPrompt);
+    const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 2048, "google/gemma-4-31b-it");
     
     // Normalize variations to always match the SemanticVariation interface { text, confidence, source }
     const normalizedVariations = (raw.variations || []).map((v: any) => ({

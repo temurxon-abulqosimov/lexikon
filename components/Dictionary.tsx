@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Language, LexicalEntry, UserProfile } from '../types';
-import { translateWordCore, translateAndEnrich } from '../services/cerebras';
+import { translateWordCore, enrichLexicalEntry } from '../services/cerebras';
 import { speak, resumeAudioContext } from '../services/tts';
 import { AssemblyAIRecorder, isAssemblyAIAvailable } from '../services/stt';
 import { SEED_ARCHIVE } from '../constants';
@@ -338,18 +338,22 @@ const Dictionary: React.FC<Props> = ({
         return;
       }
 
-      const fullEntry = await translateAndEnrich(cleanQuery, sourceLang, targetLang);
-      fullEntry.normalizedTerm = normQuery;
+      const coreEntry = await translateWordCore(cleanQuery, sourceLang, targetLang);
+      coreEntry.normalizedTerm = normQuery;
       
-      setResult(fullEntry);
+      setResult(coreEntry);
       setLoading(false);
 
       if (autoAudio) {
-        speak(cleanQuery, sourceLang).then(() => speak(fullEntry.mainTranslation, targetLang)).catch(() => {});
+        speak(cleanQuery, sourceLang).then(() => speak(coreEntry.mainTranslation, targetLang)).catch(() => {});
       }
 
-      onEntrySaved(fullEntry);
-      saveGlobalEntry(fullEntry);
+      enrichLexicalEntry(coreEntry).then(enrichment => {
+        const fullEntry = { ...coreEntry, ...enrichment };
+        setResult(fullEntry);
+        onEntrySaved(fullEntry);
+        saveGlobalEntry(fullEntry);
+      });
 
     } catch (err: any) {
       const rawMsg = err?.message || String(err);

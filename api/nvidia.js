@@ -13,14 +13,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.NVIDIA_API_KEY;
+  const { messages, temperature, top_p, max_tokens, model } = req.body;
+
+  const isGemma = (model || "").includes("gemma");
+  const apiKey = isGemma
+    ? (process.env.NVIDIA_GEMMA_API_KEY || process.env.NVIDIA_API_KEY)
+    : process.env.NVIDIA_API_KEY;
+
   if (!apiKey) {
-    return res.status(500).json({ error: "NVIDIA_API_KEY not configured" });
+    return res.status(500).json({ error: "NVIDIA API key not configured" });
   }
 
   try {
-    const { messages, temperature, top_p, max_tokens } = req.body;
-
     const upstream = await fetch(NVIDIA_API_URL, {
       method: "POST",
       headers: {
@@ -28,7 +32,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "nvidia/nemotron-3-nano-30b-a3b",
+        model: model || "nvidia/nemotron-3-nano-30b-a3b",
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 1,
