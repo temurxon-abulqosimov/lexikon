@@ -244,7 +244,7 @@ Return a JSON object with:
 5. "idioms": array of 2 natural sentences in ${entry.sourceLang} with translations in ${entry.targetLang} — each object: { "text" (sentence in ${entry.sourceLang}), "translation" (in ${entry.targetLang}), "context" }`;
 
   try {
-    const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 2048);
+    const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 512, "google/gemma-3n-e4b-it");
     
     // Normalize variations to always match the SemanticVariation interface { text, confidence, source }
     const normalizedVariations = (raw.variations || []).map((v: any) => ({
