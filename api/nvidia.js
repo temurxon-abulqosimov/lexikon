@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "nvidia/llama-3.1-nemotron-nano-8b-v1",
+        model: model || "nvidia/nemotron-mini-4b-instruct",
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 1,

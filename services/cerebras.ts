@@ -146,29 +146,12 @@ export async function translateAndEnrich(
   targetLanguage: Language
 ): Promise<LexicalEntry> {
   const systemPrompt =
-    "Output ONLY a valid JSON object. No text, no markdown, no explanation, no thinking. Just the raw JSON object starting with { and ending with }.";
+    "Output ONLY valid JSON. No text, no markdown, no thinking.";
 
-  const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage} and provide full philological analysis.
+  const userPrompt = `Translate "${query}" (${sourceLanguage}→${targetLanguage}). Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}.
+JSON:{"term":"","mainTranslation":"","partOfSpeech":"","gender":"","plural":"","cefrLevel":"","etymology":"","synonyms":["3 in ${sourceLanguage}"],"variations":[{"text":"in ${targetLanguage}","confidence":0.9}],"idioms":[{"text":"in ${sourceLanguage}","translation":"in ${targetLanguage}","context":""}]}`;
 
-IMPORTANT LANGUAGE RULES:
-- "synonyms" MUST be in ${sourceLanguage} only
-- "variations" MUST be in ${targetLanguage} only
-- "literature" and "idioms" MUST be in ${sourceLanguage}
-
-Return a JSON object with ALL of these fields:
-- "term": the original word/phrase
-- "mainTranslation": the primary translation
-- "partOfSpeech": grammatical category
-- "gender": gender if German (m/f/n), otherwise omit
-- "plural": plural form if German, otherwise omit
-- "cefrLevel": CEFR level (A1–C2) for non-Uzbek source, otherwise omit
-- "etymology": origin/etymology string (in English)
-- "synonyms": array of 3 synonyms in ${sourceLanguage}
-- "variations": array of 3 variations in ${targetLanguage}, each: { "text", "confidence" (0.0–1.0) }
-- "literature": array of 2 concise quotes (max 15 words, in ${sourceLanguage}), each: { "text", "translation" (in ${targetLanguage}), "source", "author" }
-- "idioms": array of 2 natural sentences in ${sourceLanguage}, each: { "text", "translation" (in ${targetLanguage}), "context" }`;
-
-  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 8192);
+  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 2048);
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
     text: v.text || v.term || "",
