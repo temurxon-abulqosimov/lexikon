@@ -226,25 +226,13 @@ export async function enrichLexicalEntry(
   const systemPrompt =
     "Output ONLY a valid JSON object. No text, no markdown, no explanation, no thinking. Just the raw JSON object starting with { and ending with }.";
 
-  const userPrompt = `Detailed philological analysis for "${entry.term}".
-Source language (original word): ${entry.sourceLang}
-Target language (translation): ${entry.targetLang}
-
-IMPORTANT LANGUAGE RULES:
-- "synonyms" MUST be in ${entry.sourceLang} (the source language only). For example, if source is English, all synonyms must be English words.
-- "variations" MUST be in ${entry.targetLang} (the target language only). For example, if target is Uzbek, all variations must be Uzbek words.
-- "literature" quotes MUST be in ${entry.sourceLang}
-- "idioms" sentences MUST be in ${entry.sourceLang}
-
-Return a JSON object with:
-1. "etymology": origin/etymology string (in English)
-2. "synonyms": array of 3 synonyms in ${entry.sourceLang} ONLY (NOT in ${entry.targetLang})
-3. "variations": array of 3 variations in ${entry.targetLang} ONLY (NOT in ${entry.sourceLang}) — each object: { "text" (variation in ${entry.targetLang}), "confidence" (decimal 0.0–1.0) }
-4. "literature": array of 2 concise quotes (max 15 words each, in ${entry.sourceLang}) — each object: { "text" (quote in ${entry.sourceLang}), "translation" (in ${entry.targetLang}), "source", "author" }
-5. "idioms": array of 2 natural sentences in ${entry.sourceLang} with translations in ${entry.targetLang} — each object: { "text" (sentence in ${entry.sourceLang}), "translation" (in ${entry.targetLang}), "context" }`;
+  const userPrompt = `Philological analysis for "${entry.term}" (${entry.sourceLang} → ${entry.targetLang}).
+Synonyms in ${entry.sourceLang}. Variations in ${entry.targetLang}.
+Return JSON:
+{ "etymology": "string", "synonyms": ["3 words in ${entry.sourceLang}"], "variations": [{"text":"in ${entry.targetLang}","confidence":0.9}], "idioms": [{"text":"sentence in ${entry.sourceLang}","translation":"in ${entry.targetLang}","context":"usage"}] }`;
 
   try {
-    const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 512, "google/gemma-3n-e4b-it");
+    const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 4096);
     
     // Normalize variations to always match the SemanticVariation interface { text, confidence, source }
     const normalizedVariations = (raw.variations || []).map((v: any) => ({
