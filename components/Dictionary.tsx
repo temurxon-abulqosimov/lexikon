@@ -353,7 +353,7 @@ const Dictionary: React.FC<Props> = ({
         setResult(fullEntry);
         onEntrySaved(fullEntry);
         saveGlobalEntry(fullEntry);
-      });
+      }).catch(() => {});
 
     } catch (err: any) {
       const rawMsg = err?.message || String(err);
