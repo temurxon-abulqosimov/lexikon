@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "nvidia/nemotron-3-nano-30b-a3b",
+        model: model || "deepseek-ai/deepseek-v4-flash",
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 1,
