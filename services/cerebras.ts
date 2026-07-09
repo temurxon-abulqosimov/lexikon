@@ -233,7 +233,7 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
     systemPrompt,
     userPrompt,
     (content) => onPartial?.(content),
-    1024
+    2048
   );
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
