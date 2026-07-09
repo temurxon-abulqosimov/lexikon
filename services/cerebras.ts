@@ -146,10 +146,24 @@ export async function translateAndEnrich(
   targetLanguage: Language
 ): Promise<LexicalEntry> {
   const systemPrompt =
-    "Output ONLY valid JSON. No text, no markdown, no thinking.";
+    "You are a dictionary. Output ONLY valid JSON. No text before or after.";
 
-  const userPrompt = `Translate "${query}" (${sourceLanguage}→${targetLanguage}). Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}. Literature quotes in ${sourceLanguage}.
-JSON:{"term":"","mainTranslation":"","partOfSpeech":"","gender":"","plural":"","cefrLevel":"","etymology":"","synonyms":["3 in ${sourceLanguage}"],"variations":[{"text":"in ${targetLanguage}","confidence":0.9}],"literature":[{"text":"quote in ${sourceLanguage}","translation":"in ${targetLanguage}","source":"book/work","author":"author"}],"idioms":[{"text":"in ${sourceLanguage}","translation":"in ${targetLanguage}","context":""}]}`;
+  const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage}.
+Synonyms must be in ${sourceLanguage}. Variations must be in ${targetLanguage}. Literature quotes in ${sourceLanguage}.
+Return this exact JSON structure with your answers:
+{
+  "term": "${query}",
+  "mainTranslation": "your translation",
+  "partOfSpeech": "noun/verb/adjective/etc",
+  "gender": "m/f/n or empty",
+  "plural": "plural form or empty",
+  "cefrLevel": "A1-C2 or empty",
+  "etymology": "origin of the word",
+  "synonyms": ["synonym1", "synonym2", "synonym3"],
+  "variations": [{"text": "variation1", "confidence": 0.9}],
+  "literature": [{"text": "famous quote", "translation": "translation", "source": "work name", "author": "author name"}],
+  "idioms": [{"text": "example sentence", "translation": "translation", "context": "usage context"}]
+}`;
 
   const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 16384);
 
