@@ -91,6 +91,82 @@ async function openrouterRequest<T>(
 }
 
 /**
+ * Streaming fetch helper: reads SSE chunks, calls onChunk with accumulated content.
+ */
+async function openrouterRequestStream<T>(
+  systemPrompt: string,
+  userPrompt: string,
+  onChunk: (accumulated: string) => void,
+  maxTokens = 1024,
+  model?: string
+): Promise<T> {
+  const response = await fetch(PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 1,
+      top_p: 1,
+      max_tokens: maxTokens,
+      ...(model ? { model } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`NVIDIA API error: ${response.status} – ${errText}`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullContent = "";
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            fullContent += content;
+            onChunk(fullContent);
+          }
+        } catch {}
+      }
+    }
+  }
+
+  let cleaned = fullContent.trim();
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  } else {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) cleaned = jsonMatch[0];
+  }
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch (e) {
+    console.error("JSON parse failed. Raw:", fullContent);
+    throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+  }
+}
+
+/**
  * PHASE 1: Lightning Fast Core Translation
  * Focused strictly on headword data.
  */
@@ -143,29 +219,22 @@ Return a JSON object with these fields:
 export async function translateAndEnrich(
   query: string,
   sourceLanguage: Language,
-  targetLanguage: Language
+  targetLanguage: Language,
+  onPartial?: (partial: string) => void
 ): Promise<LexicalEntry> {
   const systemPrompt =
     "You are a dictionary. Output ONLY valid JSON. No text before or after.";
 
   const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage}.
-Synonyms must be in ${sourceLanguage}. Variations must be in ${targetLanguage}. Literature quotes in ${sourceLanguage}.
-Return this exact JSON structure with your answers:
-{
-  "term": "${query}",
-  "mainTranslation": "your translation",
-  "partOfSpeech": "noun/verb/adjective/etc",
-  "gender": "m/f/n or empty",
-  "plural": "plural form or empty",
-  "cefrLevel": "A1-C2 or empty",
-  "etymology": "origin of the word",
-  "synonyms": ["synonym1", "synonym2", "synonym3"],
-  "variations": [{"text": "variation1", "confidence": 0.9}],
-  "literature": [{"text": "famous quote", "translation": "translation", "source": "work name", "author": "author name"}],
-  "idioms": [{"text": "example sentence", "translation": "translation", "context": "usage context"}]
-}`;
+Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}. Literature quotes in ${sourceLanguage}.
+JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["..."],"variations":[{"text":"...","confidence":0.9}],"literature":[{"text":"...","translation":"...","source":"...","author":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
 
-  const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 16384);
+  const raw = await openrouterRequestStream<any>(
+    systemPrompt,
+    userPrompt,
+    (content) => onPartial?.(content),
+    1024
+  );
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
     text: v.text || v.term || "",

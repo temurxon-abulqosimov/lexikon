@@ -327,20 +327,49 @@ const Dictionary: React.FC<Props> = ({
     setResult(null);
 
     try {
-      const globalHit = await fetchGlobalEntry(normQuery, sourceLang, targetLang);
-      if (globalHit) {
+      // Start both in parallel — don't wait for Supabase before calling AI
+      let resolved = false;
+      const globalHitPromise = fetchGlobalEntry(normQuery, sourceLang, targetLang);
+
+      const fullEntry = await translateAndEnrich(cleanQuery, sourceLang, targetLang, (partial) => {
+        if (resolved) return;
+        // Extract mainTranslation from partial JSON for instant preview
+        const match = partial.match(/"mainTranslation"\s*:\s*"([^"]+)"/);
+        if (match) {
+          setLoading(false);
+          setResult({
+            id: "",
+            term: cleanQuery,
+            normalizedTerm: normQuery,
+            mainTranslation: match[1],
+            sourceLang,
+            targetLang,
+            philology: { etymology: "", partOfSpeech: "" },
+            culture: { usage: "", register: "neutral", notes: "" },
+            synonyms: [],
+            variations: [],
+            literature: [],
+            realLifeSentences: [],
+            idioms: [],
+            timestamp: Date.now(),
+          } as LexicalEntry);
+        }
+      });
+
+      // Check if Supabase had a cached hit while we were streaming
+      const globalHit = await globalHitPromise;
+      if (globalHit && !resolved) {
+        resolved = true;
         setResult(globalHit);
         onEntrySaved(globalHit);
-        setLoading(false);
         if (autoAudio) {
           speak(cleanQuery, sourceLang).then(() => speak(globalHit.mainTranslation, targetLang)).catch(() => {});
         }
         return;
       }
 
-      const fullEntry = await translateAndEnrich(cleanQuery, sourceLang, targetLang);
+      resolved = true;
       fullEntry.normalizedTerm = normQuery;
-      
       setResult(fullEntry);
       setLoading(false);
 
