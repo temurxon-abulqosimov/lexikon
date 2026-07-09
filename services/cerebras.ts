@@ -148,8 +148,8 @@ export async function translateAndEnrich(
   const systemPrompt =
     "Output ONLY valid JSON. No text, no markdown, no thinking.";
 
-  const userPrompt = `Translate "${query}" (${sourceLanguage}→${targetLanguage}). Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}.
-JSON:{"term":"","mainTranslation":"","partOfSpeech":"","gender":"","plural":"","cefrLevel":"","etymology":"","synonyms":["3 in ${sourceLanguage}"],"variations":[{"text":"in ${targetLanguage}","confidence":0.9}],"idioms":[{"text":"in ${sourceLanguage}","translation":"in ${targetLanguage}","context":""}]}`;
+  const userPrompt = `Translate "${query}" (${sourceLanguage}→${targetLanguage}). Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}. Literature quotes in ${sourceLanguage}.
+JSON:{"term":"","mainTranslation":"","partOfSpeech":"","gender":"","plural":"","cefrLevel":"","etymology":"","synonyms":["3 in ${sourceLanguage}"],"variations":[{"text":"in ${targetLanguage}","confidence":0.9}],"literature":[{"text":"quote in ${sourceLanguage}","translation":"in ${targetLanguage}","source":"book/work","author":"author"}],"idioms":[{"text":"in ${sourceLanguage}","translation":"in ${targetLanguage}","context":""}]}`;
 
   const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 16384);
 
