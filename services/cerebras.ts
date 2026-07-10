@@ -229,6 +229,8 @@ export async function translateAndEnrich(
 STRICT LANGUAGE RULES:
 - term, synonyms, literature text, idiom text MUST be in ${sourceLanguage}.
 - mainTranslation, variations, etymology, literature.translation, idiom.translation, idiom.context MUST be in ${targetLanguage}.
+- variations are alternative ${targetLanguage} words/phrases for the mainTranslation (NOT ${sourceLanguage} synonyms).
+- When ${targetLanguage} is Uzbek, ALL Uzbek output MUST be in Latin script (e.g., "salom", "kitob", "murakkab") — NEVER Cyrillic.
 - Do NOT translate explanations or example translations into English; use ${targetLanguage} only.
 - Keep source/author names in their original language.
 JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["..."],"variations":[{"text":"...","confidence":0.9}],"literature":[{"text":"...","translation":"...","source":"...","author":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
@@ -300,6 +302,8 @@ export async function enrichLexicalEntry(
 STRICT LANGUAGE RULES:
 - synonyms and idiom text MUST be in ${entry.sourceLang}.
 - variations, etymology, idiom.translation, idiom.context MUST be in ${entry.targetLang}.
+- variations are alternative ${entry.targetLang} words/phrases for the mainTranslation (NOT ${entry.sourceLang} synonyms).
+- When ${entry.targetLang} is Uzbek, ALL Uzbek output MUST be in Latin script (e.g., "salom", "kitob", "murakkab") — NEVER Cyrillic.
 - Do NOT translate explanations into English; use ${entry.targetLang} only.
 Return JSON:
 { "etymology": "string in ${entry.targetLang}", "synonyms": ["3 words in ${entry.sourceLang}"], "variations": [{"text":"in ${entry.targetLang}","confidence":0.9}], "idioms": [{"text":"sentence in ${entry.sourceLang}","translation":"in ${entry.targetLang}","context":"usage explanation in ${entry.targetLang}"}] }`;
