@@ -23,18 +23,18 @@ const App: React.FC = () => {
   const [cloudActive, setCloudActive] = useState(false);
   
   const initialHydrationRef = useRef(false);
+  const hasHydratedRef = useRef(false);
 
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('lexProfile');
-    return saved ? JSON.parse(saved) : {
-      username: 'Scholar',
-      xp: 0,
-      rank: RANKS[0].title,
-      searchCount: 0,
-      arenaWins: 0,
-      accuracy: 100,
-      streak: 0
-    };
+  // Profile is intentionally NOT cached in localStorage.
+  // XP, rank, and stats are the source of truth in Supabase so they persist across devices/sessions.
+  const [profile, setProfile] = useState<UserProfile>({
+    username: 'Scholar',
+    xp: 0,
+    rank: RANKS[0].title,
+    searchCount: 0,
+    arenaWins: 0,
+    accuracy: 100,
+    streak: 0
   });
 
   // Admin check — reads directly from Telegram SDK and profile
@@ -139,6 +139,7 @@ const App: React.FC = () => {
             
             setProfile(cloudProfile);
             setCloudActive(true);
+            hasHydratedRef.current = true;
 
             // Retrieve and merge history entries from Supabase
             const cloudHistory = await fetchUserHistory(telegramId);
@@ -147,8 +148,15 @@ const App: React.FC = () => {
             }
           } catch (err) {
             console.error("Telegram Auth/Cloud Sync failed:", err);
+            // Even on error, mark hydration as done so local changes can still attempt to sync.
+            hasHydratedRef.current = true;
           }
+        } else {
+          // No Telegram user; allow local-only mode to sync if needed.
+          hasHydratedRef.current = true;
         }
+      } else {
+        hasHydratedRef.current = true;
       }
     };
 
@@ -160,8 +168,8 @@ const App: React.FC = () => {
   }, [history]);
 
   useEffect(() => {
-    localStorage.setItem('lexProfile', JSON.stringify(profile));
-    if (profile.telegramId) {
+    // Do not cache profile in localStorage. XP/rank must be persisted in Supabase only.
+    if (hasHydratedRef.current && profile.telegramId) {
       syncProfileToCloud(profile);
     }
   }, [profile, syncProfileToCloud]);
