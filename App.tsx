@@ -129,6 +129,13 @@ const App: React.FC = () => {
               cloudProfile.firstName = tgUser.first_name || cloudProfile.firstName;
               cloudProfile.lastName = tgUser.last_name || cloudProfile.lastName;
             }
+
+            // Ensure xp and other numeric fields are never undefined/NaN
+            cloudProfile.xp = typeof cloudProfile.xp === 'number' ? cloudProfile.xp : 0;
+            cloudProfile.searchCount = typeof cloudProfile.searchCount === 'number' ? cloudProfile.searchCount : 0;
+            cloudProfile.arenaWins = typeof cloudProfile.arenaWins === 'number' ? cloudProfile.arenaWins : 0;
+            cloudProfile.accuracy = typeof cloudProfile.accuracy === 'number' ? cloudProfile.accuracy : 100;
+            cloudProfile.streak = typeof cloudProfile.streak === 'number' ? cloudProfile.streak : 0;
             
             setProfile(cloudProfile);
             setCloudActive(true);

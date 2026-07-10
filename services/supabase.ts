@@ -37,8 +37,9 @@ export async function fetchAdminUsers() {
     if (!profileError && profileData && profileData.length > 0) {
       return profileData.map(p => ({
         username: p.username,
-        first_name: p.first_name || p.username || 'Scholar',
+        first_name: p.first_name || '',
         last_name: p.last_name || '',
+        telegram_id: p.telegram_id,
         created_at: p.updated_at
       }));
     }
@@ -56,8 +57,9 @@ export async function fetchAdminUsers() {
     if (!usersError && usersData && usersData.length > 0) {
       return usersData.map(u => ({
         username: u.username,
-        first_name: u.first_name || u.username || 'Scholar',
+        first_name: u.first_name || '',
         last_name: u.last_name || '',
+        telegram_id: u.telegram_id,
         created_at: u.created_at
       }));
     }

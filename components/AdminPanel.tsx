@@ -147,17 +147,20 @@ const AdminPanel: React.FC = () => {
             </h3>
           </div>
           <div className="bg-white border border-stone-100 rounded-sm divide-y divide-stone-50 overflow-hidden">
-             {stats?.users.map((u, i) => (
+             {stats?.users.map((u, i) => {
+               const displayName = [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.username || 'Unknown Scholar';
+               return (
                <div key={i} className="p-6 flex items-center justify-between group hover:bg-stone-50 transition-colors">
                  <div>
-                    <p className="serif text-xl font-bold text-stone-900">{u.first_name || 'Anonymous'} {u.last_name || ''}</p>
-                    <p className="text-[9px] uppercase tracking-widest text-[#7c1a1a] font-bold mt-1">{u.username ? `@${u.username}` : ''}</p>
+                    <p className="serif text-xl font-bold text-stone-900">{displayName}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-[#7c1a1a] font-bold mt-1">{u.username ? `@${u.username}` : u.telegram_id ? `ID: ${u.telegram_id}` : ''}</p>
                  </div>
                  <span className="text-[9px] font-mono text-stone-300">
-                   {new Date(u.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                   {u.created_at ? new Date(u.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
                  </span>
                </div>
-             ))}
+               );
+             })}
              {stats?.users.length === 0 && (
                <div className="p-12 text-center text-stone-300 serif italic">No scholars found in registry.</div>
              )}
