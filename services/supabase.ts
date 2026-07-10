@@ -35,13 +35,16 @@ export async function fetchAdminUsers() {
       .order('updated_at', { ascending: false });
 
     if (!profileError && profileData && profileData.length > 0) {
-      return profileData.map(p => ({
-        username: p.username,
-        first_name: p.first_name || '',
-        last_name: p.last_name || '',
-        telegram_id: p.telegram_id,
-        created_at: p.updated_at
-      }));
+      return profileData.map(p => {
+        const pd = p.profile_data || {};
+        return {
+          username: p.username,
+          first_name: p.first_name || pd.firstName || '',
+          last_name: p.last_name || pd.lastName || '',
+          telegram_id: p.telegram_id,
+          created_at: p.updated_at
+        };
+      });
     }
 
     if (profileError) {
@@ -252,13 +255,13 @@ export async function upsertProfile(profile: UserProfile) {
       });
 
     // 2. Sync app state (Primary Source of Truth)
+    // Note: lex_profiles only stores telegram_id, username, profile_data, updated_at.
+    // Names live inside profile_data and are surfaced by fetchAdminUsers via profile_data fallback.
     const { error } = await supabase
       .from('lex_profiles')
       .upsert({ 
         telegram_id: profile.telegramId,
         username: profile.username || 'Scholar',
-        first_name: profile.firstName || '',
-        last_name: profile.lastName || '',
         profile_data: profile,
         updated_at: new Date().toISOString() 
       }, { onConflict: 'telegram_id' });

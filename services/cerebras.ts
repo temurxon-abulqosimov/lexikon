@@ -226,7 +226,11 @@ export async function translateAndEnrich(
     "You are a dictionary. Output ONLY valid JSON. No text before or after.";
 
   const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage}.
-Synonyms in ${sourceLanguage}. Variations in ${targetLanguage}. Literature quotes in ${sourceLanguage}.
+STRICT LANGUAGE RULES:
+- term, synonyms, literature text, idiom text MUST be in ${sourceLanguage}.
+- mainTranslation, variations, etymology, literature.translation, idiom.translation, idiom.context MUST be in ${targetLanguage}.
+- Do NOT translate explanations or example translations into English; use ${targetLanguage} only.
+- Keep source/author names in their original language.
 JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["..."],"variations":[{"text":"...","confidence":0.9}],"literature":[{"text":"...","translation":"...","source":"...","author":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
 
   const raw = await openrouterRequestStream<any>(
@@ -293,9 +297,12 @@ export async function enrichLexicalEntry(
     "Output ONLY a valid JSON object. No text, no markdown, no explanation, no thinking. Just the raw JSON object starting with { and ending with }.";
 
   const userPrompt = `Philological analysis for "${entry.term}" (${entry.sourceLang} → ${entry.targetLang}).
-Synonyms in ${entry.sourceLang}. Variations in ${entry.targetLang}.
+STRICT LANGUAGE RULES:
+- synonyms and idiom text MUST be in ${entry.sourceLang}.
+- variations, etymology, idiom.translation, idiom.context MUST be in ${entry.targetLang}.
+- Do NOT translate explanations into English; use ${entry.targetLang} only.
 Return JSON:
-{ "etymology": "string", "synonyms": ["3 words in ${entry.sourceLang}"], "variations": [{"text":"in ${entry.targetLang}","confidence":0.9}], "idioms": [{"text":"sentence in ${entry.sourceLang}","translation":"in ${entry.targetLang}","context":"usage"}] }`;
+{ "etymology": "string in ${entry.targetLang}", "synonyms": ["3 words in ${entry.sourceLang}"], "variations": [{"text":"in ${entry.targetLang}","confidence":0.9}], "idioms": [{"text":"sentence in ${entry.sourceLang}","translation":"in ${entry.targetLang}","context":"usage explanation in ${entry.targetLang}"}] }`;
 
   try {
     const raw = await openrouterRequest<any>(systemPrompt, userPrompt, 1, 4096);
