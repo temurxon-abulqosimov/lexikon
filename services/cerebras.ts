@@ -7,7 +7,12 @@ const generateId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return "lex-" + Date.now() + "-" + Math.random().toString(36).substring(2, 11);
+  // Fallback: generate a valid v4 UUID manually so database UUID columns never reject it.
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 };
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -92,78 +97,101 @@ async function openrouterRequest<T>(
 
 /**
  * Streaming fetch helper: reads SSE chunks, calls onChunk with accumulated content.
+ * Retries on 429/5xx/timeout errors.
  */
 async function openrouterRequestStream<T>(
   systemPrompt: string,
   userPrompt: string,
   onChunk: (accumulated: string) => void,
   maxTokens = 1024,
-  model?: string
+  model?: string,
+  retries = 1
 ): Promise<T> {
-  const response = await fetch(PROXY_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 1,
-      top_p: 1,
-      max_tokens: maxTokens,
-      ...(model ? { model } : {}),
-    }),
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`NVIDIA API error: ${response.status} – ${errText}`);
-  }
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      console.warn(`[LEX] Streaming request failed, retrying (${attempt}/${retries})...`);
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
 
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let fullContent = "";
-  let buffer = "";
+    try {
+      const response = await fetch(PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 1,
+          top_p: 1,
+          max_tokens: maxTokens,
+          ...(model ? { model } : {}),
+        }),
+      });
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            fullContent += content;
-            onChunk(fullContent);
-          }
-        } catch {}
+      if (!response.ok) {
+        const errText = await response.text();
+        const err = new Error(`NVIDIA API error: ${response.status} – ${errText}`);
+        if ((response.status === 429 || response.status >= 500) && attempt < retries) {
+          lastError = err;
+          continue;
+        }
+        throw err;
       }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullContent += content;
+                onChunk(fullContent);
+              }
+            } catch {}
+          }
+        }
+      }
+
+      let cleaned = fullContent.trim();
+      const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fenceMatch) {
+        cleaned = fenceMatch[1].trim();
+      } else {
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) cleaned = jsonMatch[0];
+      }
+
+      try {
+        return JSON.parse(cleaned) as T;
+      } catch (e) {
+        console.error("JSON parse failed. Raw:", fullContent);
+        throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+      }
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt >= retries) break;
     }
   }
 
-  let cleaned = fullContent.trim();
-  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenceMatch) {
-    cleaned = fenceMatch[1].trim();
-  } else {
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) cleaned = jsonMatch[0];
-  }
-
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch (e) {
-    console.error("JSON parse failed. Raw:", fullContent);
-    throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
-  }
+  throw lastError || new Error("Streaming request failed after retries");
 }
 
 /**
@@ -239,7 +267,7 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
     systemPrompt,
     userPrompt,
     (content) => onPartial?.(content),
-    3072
+    2048
   );
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({

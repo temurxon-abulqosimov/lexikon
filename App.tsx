@@ -24,6 +24,7 @@ const App: React.FC = () => {
   
   const initialHydrationRef = useRef(false);
   const hasHydratedRef = useRef(false);
+  const profileRef = useRef<UserProfile | null>(null);
 
   // Profile is intentionally NOT cached in localStorage.
   // XP, rank, and stats are the source of truth in Supabase so they persist across devices/sessions.
@@ -79,9 +80,10 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       await upsertProfile(newProfile);
+      console.log(`[LEX] Cloud sync succeeded: xp=${newProfile.xp}`);
       setCloudActive(true);
     } catch (err) {
-      console.error("Cloud Archive Sync Failed:", err);
+      console.error("[LEX] Cloud Archive Sync Failed:", err);
       setCloudActive(false);
     } finally {
       setIsSyncing(false);
@@ -130,12 +132,30 @@ const App: React.FC = () => {
               cloudProfile.lastName = tgUser.last_name || cloudProfile.lastName;
             }
 
+            // Critical: telegramId must be present or cloud sync will be skipped.
+            cloudProfile.telegramId = telegramId;
+
             // Ensure xp and other numeric fields are never undefined/NaN
             cloudProfile.xp = typeof cloudProfile.xp === 'number' ? cloudProfile.xp : 0;
             cloudProfile.searchCount = typeof cloudProfile.searchCount === 'number' ? cloudProfile.searchCount : 0;
             cloudProfile.arenaWins = typeof cloudProfile.arenaWins === 'number' ? cloudProfile.arenaWins : 0;
             cloudProfile.accuracy = typeof cloudProfile.accuracy === 'number' ? cloudProfile.accuracy : 100;
             cloudProfile.streak = typeof cloudProfile.streak === 'number' ? cloudProfile.streak : 0;
+            cloudProfile.rank = cloudProfile.rank || RANKS[0].title;
+
+            // Merge any progress earned before hydration completed (e.g., user searched immediately).
+            const localProfile = profileRef.current;
+            if (localProfile && (localProfile.xp > 0 || localProfile.searchCount > 0 || localProfile.arenaWins > 0)) {
+              cloudProfile.xp = Math.max(cloudProfile.xp, localProfile.xp);
+              cloudProfile.searchCount = Math.max(cloudProfile.searchCount, localProfile.searchCount);
+              cloudProfile.arenaWins = Math.max(cloudProfile.arenaWins, localProfile.arenaWins);
+              cloudProfile.streak = Math.max(cloudProfile.streak, localProfile.streak);
+              if (localProfile.accuracy !== 100) {
+                cloudProfile.accuracy = Math.round((cloudProfile.accuracy + localProfile.accuracy) / 2);
+              }
+              // Recalculate rank from merged XP
+              cloudProfile.rank = RANKS.reduce((prev, curr) => cloudProfile.xp >= curr.minXp ? curr : prev, RANKS[0]).title;
+            }
             
             setProfile(cloudProfile);
             setCloudActive(true);
@@ -168,8 +188,12 @@ const App: React.FC = () => {
   }, [history]);
 
   useEffect(() => {
+    // Keep ref in sync with state so hydration can merge pre-hydration progress.
+    profileRef.current = profile;
+
     // Do not cache profile in localStorage. XP/rank must be persisted in Supabase only.
     if (hasHydratedRef.current && profile.telegramId) {
+      console.log(`[LEX] Syncing profile to cloud: id=${profile.telegramId}, xp=${profile.xp}, searches=${profile.searchCount}`);
       syncProfileToCloud(profile);
     }
   }, [profile, syncProfileToCloud]);

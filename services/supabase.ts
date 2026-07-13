@@ -193,7 +193,9 @@ export async function fetchProfile(telegramId: number): Promise<UserProfile | nu
       handleSupabaseError(error, 'lex_profiles');
       return null;
     }
-    return (data?.profile_data as UserProfile) || null;
+    const profile = (data?.profile_data as UserProfile) || null;
+    console.log(`[fetchProfile] telegram_id=${telegramId}, xp=${profile?.xp}, rank=${profile?.rank}`);
+    return profile;
   } catch (err) {
     console.error("Profile Fetch Failed:", err);
     return null;
@@ -221,6 +223,7 @@ export async function fetchUserHistory(telegramId: number): Promise<LexicalEntry
 
 export async function saveUserHistoryEntry(telegramId: number, entry: LexicalEntry) {
   try {
+    console.log(`[saveUserHistoryEntry] saving telegram_id=${telegramId}, entry_id=${entry.id}`);
     const { error } = await supabase
       .from('lex_user_history')
       .upsert({
@@ -230,14 +233,23 @@ export async function saveUserHistoryEntry(telegramId: number, entry: LexicalEnt
         created_at: new Date().toISOString()
       }, { onConflict: 'telegram_id,entry_id' });
     
-    if (error) handleSupabaseError(error, 'lex_user_history');
+    if (error) {
+      console.error(`[saveUserHistoryEntry] Supabase error:`, error);
+      handleSupabaseError(error, 'lex_user_history');
+      throw error;
+    }
+    console.log('[saveUserHistoryEntry] success');
   } catch (err) {
     console.error("History Sync Failed:", err);
+    throw err;
   }
 }
 
 export async function upsertProfile(profile: UserProfile) {
-  if (!profile.telegramId) return;
+  if (!profile.telegramId) {
+    console.warn('[upsertProfile] skipped: no telegramId');
+    return;
+  }
   try {
     // 1. Sync identity (Mirror)
     // We run this as a separate, non-blocking call. If it fails (e.g., 404), it doesn't stop the app sync.
@@ -257,6 +269,7 @@ export async function upsertProfile(profile: UserProfile) {
     // 2. Sync app state (Primary Source of Truth)
     // Note: lex_profiles only stores telegram_id, username, profile_data, updated_at.
     // Names live inside profile_data and are surfaced by fetchAdminUsers via profile_data fallback.
+    console.log(`[upsertProfile] saving telegram_id=${profile.telegramId}, xp=${profile.xp}, searches=${profile.searchCount}`);
     const { error } = await supabase
       .from('lex_profiles')
       .upsert({ 
@@ -266,8 +279,14 @@ export async function upsertProfile(profile: UserProfile) {
         updated_at: new Date().toISOString() 
       }, { onConflict: 'telegram_id' });
     
-    if (error) handleSupabaseError(error, 'lex_profiles');
+    if (error) {
+      console.error('[upsertProfile] Supabase error:', error);
+      handleSupabaseError(error, 'lex_profiles');
+      throw error;
+    }
+    console.log('[upsertProfile] success');
   } catch (err) {
-    console.error("Profile Upsert Failed:", err);
+    console.error("[upsertProfile] Profile Upsert Failed:", err);
+    throw err;
   }
 }
