@@ -263,12 +263,27 @@ STRICT LANGUAGE RULES:
 - Keep source/author names in their original language.
 JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["..."],"variations":[{"text":"...","confidence":0.9}],"literature":[{"text":"...","translation":"...","source":"...","author":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
 
-  const raw = await openrouterRequestStream<any>(
-    systemPrompt,
-    userPrompt,
-    (content) => onPartial?.(content),
-    2048
-  );
+  let raw: any;
+  try {
+    raw = await openrouterRequestStream<any>(
+      systemPrompt,
+      userPrompt,
+      (content) => onPartial?.(content),
+      1536,
+      undefined,
+      1
+    );
+  } catch (err) {
+    console.warn(`[LEX] Primary model failed, falling back to smaller model:`, err);
+    raw = await openrouterRequestStream<any>(
+      systemPrompt,
+      userPrompt,
+      (content) => onPartial?.(content),
+      1280,
+      "meta/llama-3.1-8b-instruct",
+      1
+    );
+  }
 
   const normalizedVariations = (raw.variations || []).map((v: any) => ({
     text: v.text || v.term || "",

@@ -36,11 +36,11 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "openai/gpt-oss-120b",
+        model: model || "nvidia/llama-3.1-nemotron-70b-instruct",
         messages,
         temperature: temperature ?? 1,
         top_p: top_p ?? 1,
-        max_tokens: max_tokens ?? 2048,
+        max_tokens: max_tokens ?? 1536,
         stream: true,
       }),
     });

@@ -179,7 +179,7 @@ const AdminPanel: React.FC = () => {
             </div>
             <div className="flex justify-between border-b border-stone-800 pb-4">
               <span className="text-stone-500 uppercase text-[10px]">Linguistic Engine</span>
-              <span className="text-stone-200">NVIDIA openai/gpt-oss-120b</span>
+              <span className="text-stone-200">NVIDIA Nemotron 70B</span>
             </div>
             <div className="flex justify-between border-b border-stone-800 pb-4">
               <span className="text-stone-500 uppercase text-[10px]">Mini-App Integration</span>
