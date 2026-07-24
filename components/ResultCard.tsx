@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { LexicalEntry } from '../types';
 import { speak, resumeAudioContext } from '../services/tts';
 
@@ -12,12 +12,46 @@ const Shimmer: React.FC<{ className?: string }> = ({ className }) => (
   <div className={`animate-pulse bg-stone-100 rounded-sm ${className}`} />
 );
 
+const CopyIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 const ResultCard: React.FC<Props> = ({ entry, onSearchTerm }) => {
   const isInflected = entry.lemma && entry.lemma.toLowerCase() !== entry.term.toLowerCase();
-  
+  const [copied, setCopied] = useState(false);
+
   const handleSpeak = async (text: string, lang: any) => {
     await resumeAudioContext();
     await speak(text, lang);
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Fallback for older browsers / Telegram webviews without clipboard permission
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   };
 
   const displayIdioms = entry.idioms && entry.idioms.length > 0 
@@ -78,12 +112,23 @@ const ResultCard: React.FC<Props> = ({ entry, onSearchTerm }) => {
               <h2 className="text-5xl md:text-9xl serif font-black tracking-tighter lowercase leading-none text-[#7c1a1a]">
                 {entry.mainTranslation}
               </h2>
-              <button 
-                onClick={() => handleSpeak(entry.mainTranslation, entry.targetLang)} 
-                className="text-stone-300 hover:text-[#7c1a1a] transition-all p-3 hover:bg-white rounded-full border border-transparent hover:border-stone-100 shadow-sm"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleSpeak(entry.mainTranslation, entry.targetLang)} 
+                  className="text-stone-300 hover:text-[#7c1a1a] transition-all p-3 hover:bg-white rounded-full border border-transparent hover:border-stone-100 shadow-sm"
+                  aria-label="Speak translation"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                </button>
+                <button 
+                  onClick={() => handleCopy(entry.mainTranslation)} 
+                  className={`transition-all p-3 rounded-full border shadow-sm ${copied ? 'text-green-600 bg-green-50 border-green-200' : 'text-stone-300 hover:text-[#7c1a1a] hover:bg-white border-transparent hover:border-stone-100'}`}
+                  aria-label="Copy translation"
+                  title={copied ? 'Copied!' : 'Copy translation'}
+                >
+                  {copied ? <CheckIcon /> : <CopyIcon />}
+                </button>
+              </div>
             </div>
           </div>
         </div>
