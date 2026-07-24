@@ -25,7 +25,62 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Core fetch helper for NVIDIA Nemotron API (OpenAI-compatible).
+ * Attempts to repair truncated JSON by appending missing closing braces/brackets.
+ * This is a best-effort fallback when the model runs out of tokens mid-object.
+ */
+function repairJson(text: string): string {
+  let cleaned = text.trim();
+  // Extract between first { and last }
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") openBraces++;
+    else if (ch === "}") openBraces--;
+    else if (ch === "[") openBrackets++;
+    else if (ch === "]") openBrackets--;
+  }
+
+  // Close any unclosed strings first
+  if (inString) cleaned += '"';
+
+  // Then close brackets and braces
+  while (openBrackets > 0) {
+    cleaned += "]";
+    openBrackets--;
+  }
+  while (openBraces > 0) {
+    cleaned += "}";
+    openBraces--;
+  }
+
+  return cleaned;
+}
+
+/**
+ * Core fetch helper for OpenRouter API (OpenAI-compatible).
  */
 async function openrouterRequest<T>(
   systemPrompt: string,
@@ -65,7 +120,7 @@ async function openrouterRequest<T>(
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`NVIDIA API error: ${response.status} – ${errText}`);
+      throw new Error(`OpenRouter API error: ${response.status} – ${errText}`);
     }
 
     const data = await response.json();
@@ -87,8 +142,13 @@ async function openrouterRequest<T>(
     try {
       return JSON.parse(cleaned) as T;
     } catch (e) {
-      console.error("JSON parse failed. Raw:", rawContent);
-      throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+      const repaired = repairJson(cleaned);
+      try {
+        return JSON.parse(repaired) as T;
+      } catch {
+        console.error("JSON parse failed. Raw:", rawContent);
+        throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+      }
     }
   }
 
@@ -133,7 +193,7 @@ async function openrouterRequestStream<T>(
 
       if (!response.ok) {
         const errText = await response.text();
-        const err = new Error(`NVIDIA API error: ${response.status} – ${errText}`);
+        const err = new Error(`OpenRouter API error: ${response.status} – ${errText}`);
         if ((response.status === 429 || response.status >= 500) && attempt < retries) {
           lastError = err;
           continue;
@@ -182,8 +242,13 @@ async function openrouterRequestStream<T>(
       try {
         return JSON.parse(cleaned) as T;
       } catch (e) {
-        console.error("JSON parse failed. Raw:", fullContent);
-        throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+        const repaired = repairJson(cleaned);
+        try {
+          return JSON.parse(repaired) as T;
+        } catch {
+          console.error("JSON parse failed. Raw:", fullContent);
+          throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
+        }
       }
     } catch (err) {
       lastError = err as Error;
@@ -261,7 +326,9 @@ STRICT LANGUAGE RULES:
 - When ${targetLanguage} is Uzbek, ALL Uzbek output MUST be in Latin script (e.g., "salom", "kitob", "murakkab") — NEVER Cyrillic.
 - Do NOT translate explanations or example translations into English; use ${targetLanguage} only.
 - Keep source/author names in their original language.
-JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["..."],"variations":[{"text":"...","confidence":0.9}],"literature":[{"text":"...","translation":"...","source":"...","author":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
+- Keep the response concise: 2 synonyms, 2 variations, 1 literature example, 1 idiom.
+- Output ONLY the JSON object, no markdown, no explanation.
+JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["...","..."],"variations":[{"text":"...","confidence":0.9},{"text":"...","confidence":0.8}],"literature":[{"text":"...","translation":"...","source":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
 
   let raw: any;
   try {
@@ -269,18 +336,18 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
       systemPrompt,
       userPrompt,
       (content) => onPartial?.(content),
-      1536,
+      2048,
       undefined,
       1
     );
   } catch (err) {
-    console.warn(`[LEX] Primary model failed, falling back to smaller model:`, err);
+    console.warn(`[LEX] Primary model failed, falling back to backup model:`, err);
     raw = await openrouterRequestStream<any>(
       systemPrompt,
       userPrompt,
       (content) => onPartial?.(content),
-      1280,
-      "meta/llama-3.1-8b-instruct",
+      2048,
+      "google/gemini-2.5-flash-preview:free",
       1
     );
   }
