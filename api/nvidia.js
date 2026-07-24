@@ -1,38 +1,19 @@
 const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 
-export const config = {
-  runtime: "edge",
-};
-
-export default async function handler(req) {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return res.status(200).end();
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  let body;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  const { messages, temperature, top_p, max_tokens, model } = body;
+  const { messages, temperature, top_p, max_tokens, model } = req.body;
 
   const isGemma = (model || "").includes("gemma");
   const apiKey = isGemma
@@ -40,13 +21,9 @@ export default async function handler(req) {
     : process.env.NVIDIA_API_KEY;
 
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "NVIDIA API key not configured" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return res.status(500).json({ error: "NVIDIA API key not configured" });
   }
 
-  // Abort NVIDIA request before the Edge function hard limit so we can return a clean error.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);
 
@@ -72,28 +49,30 @@ export default async function handler(req) {
 
     if (!upstream.ok) {
       const errText = await upstream.text();
-      return new Response(JSON.stringify({ error: errText }), {
-        status: upstream.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return res.status(upstream.status).json({ error: errText });
     }
 
-    // Stream the response directly to the client.
-    return new Response(upstream.body, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    // True SSE streaming: forward chunks to client as they arrive
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(decoder.decode(value, { stream: true }));
+    }
+
+    res.end();
   } catch (err) {
     clearTimeout(timeoutId);
     const message = err.name === "AbortError" ? "NVIDIA API timed out" : err.message || "NVIDIA API request failed";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 504,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (!res.headersSent) {
+      return res.status(504).json({ error: message });
+    }
+    res.end();
   }
 }
