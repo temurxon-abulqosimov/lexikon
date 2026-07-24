@@ -332,17 +332,21 @@ export async function translateAndEnrich(
 
 LANGUAGE RULES (STRICT):
 - "term" = the original ${sourceLanguage} word.
-- "mainTranslation" = the most common, natural ${targetLanguage} translation.
-- "synonyms" = ONLY ${sourceLanguage} words/phrases that mean the same as "${query}". NEVER put ${targetLanguage} words here.
-- "variations" = ONLY ${targetLanguage} alternative translations of "${query}". NEVER put ${sourceLanguage} words here.
-- "literature[].text" and "idioms[].text" = ${sourceLanguage} example sentences using "${query}".
-- "literature[].translation" and "idioms[].translation" = ${targetLanguage} translation of that example.
+- "mainTranslation" = the most common, natural ${targetLanguage} translation. NEVER use rare/archaic words.
+- "synonyms" = ONLY common ${sourceLanguage} words/phrases that mean the same as "${query}". NEVER include "${query}" itself. NEVER put ${targetLanguage} words here.
+- "variations" = ONLY common ${targetLanguage} alternative translations of "${query}". NEVER put ${sourceLanguage} words here.
+- "literature[].text" and "idioms[].text" = natural, grammatically correct ${sourceLanguage} example sentences using "${query}".
+- "literature[].translation" and "idioms[].translation" = natural ${targetLanguage} translation of that example.
 - "etymology" and "idioms[].context" = in ${targetLanguage}.
+- When ${sourceLanguage} is Uzbek, use standard Latin Uzbek (e.g., "bo'ldi", "qilindi", "yaxshi").
 - When ${targetLanguage} is Uzbek, use ONLY Latin Uzbek script (e.g., "baxtli", "xursand", "quvnoq"), NEVER Cyrillic.
 - Output ONLY the JSON object. No markdown, no explanation.
 
-Example for English → Uzbek query "happy":
+Example 1 — English → Uzbek "happy":
 {"term":"happy","mainTranslation":"baxtli","partOfSpeech":"adjective","gender":"","plural":"","cefrLevel":"A1","etymology":"Ingilizcha 'hap' (tasodif) so'zidan kelib chiqqan.","synonyms":["joyful","cheerful","glad"],"variations":[{"text":"xursand","confidence":0.95},{"text":"quvnoq","confidence":0.85}],"literature":[{"text":"She felt happy about the news.","translation":"U xabaridan xursand edi.","source":"Everyday English"}],"idioms":[{"text":"happy as a clam","translation":"juda baxtli","context":"katta mamnuniyat ifodalash uchun"}]}
+
+Example 2 — Uzbek → Arabic "diqqat":
+{"term":"diqqat","mainTranslation":"دقة","partOfSpeech":"noun","gender":"","plural":"","cefrLevel":"","etymology":"في اللغة العربية، الجذر د-ق-ق يدل على الدقة والتأكد.","synonyms":["e'tibor","tazim","qayg'u"],"variations":[{"text":"انتباه","confidence":0.92},{"text":"تحقق","confidence":0.80}],"literature":[{"text":"Ushbu savolga diqqat bilan qarang.","translation":"انظر إلى هذا السؤال بانتباه.","source":"Everyday Uzbek"}],"idioms":[{"text":"diqqat qilish","translation":"الانتباه","context":"تعبير يومي للتنبيه أو التركيز"}]}
 
 Now translate "${query}" (${sourceLanguage} → ${targetLanguage}) in the same format:`;
 
@@ -368,11 +372,13 @@ Now translate "${query}" (${sourceLanguage} → ${targetLanguage}) in the same f
     );
   }
 
-  const normalizedVariations = (raw.variations || []).map((v: any) => ({
-    text: v.text || v.term || "",
-    confidence: typeof v.confidence === "number" ? v.confidence : 0.90,
-    source: "ai" as const,
-  }));
+  const normalizedVariations = (raw.variations || [])
+    .map((v: any) => ({
+      text: v.text || v.term || "",
+      confidence: typeof v.confidence === "number" ? v.confidence : 0.90,
+      source: "ai" as const,
+    }))
+    .filter((v: any) => v.text && v.text.toLowerCase().trim() !== (raw.mainTranslation || "").toLowerCase().trim());
 
   const normalizedLiterature = (raw.literature || []).map((lit: any) => ({
     text: lit.text || lit.quote || "",
@@ -387,10 +393,17 @@ Now translate "${query}" (${sourceLanguage} → ${targetLanguage}) in the same f
     context: id.context || "Colloquial usage",
   }));
 
+  // Clean synonyms: must be strings, not the query itself, no duplicates
+  const cleanQuery = query.toLowerCase().trim();
+  const cleanedSynonyms = (raw.synonyms || [])
+    .map((s: any) => (typeof s === "string" ? s.trim() : ""))
+    .filter((s: string) => s && s.toLowerCase() !== cleanQuery)
+    .filter((s: string, i: number, arr: string[]) => arr.indexOf(s) === i);
+
   return {
     id: generateId(),
     term: raw.term || query,
-    normalizedTerm: query.toLowerCase().trim(),
+    normalizedTerm: cleanQuery,
     mainTranslation: raw.mainTranslation,
     sourceLang: sourceLanguage,
     targetLang: targetLanguage,
@@ -406,7 +419,7 @@ Now translate "${query}" (${sourceLanguage} → ${targetLanguage}) in the same f
       register: "neutral",
       notes: "",
     },
-    synonyms: raw.synonyms || [],
+    synonyms: cleanedSynonyms,
     variations: normalizedVariations,
     literature: normalizedLiterature,
     realLifeSentences: normalizedIdioms,
