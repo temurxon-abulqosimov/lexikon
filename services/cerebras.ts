@@ -357,7 +357,7 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
       userPrompt,
       (content) => onPartial?.(content),
       2048,
-      "deepseek/deepseek-chat:free",
+      "nvidia/nemotron-3-nano-30b-a3b:free",
       1
     );
   }
