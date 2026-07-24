@@ -329,14 +329,22 @@ export async function translateAndEnrich(
     "You are a dictionary. Output ONLY valid JSON. No text before or after.";
 
   const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage}. Output ONLY compact JSON.
-Rules:
-- term/synonyms/literature/idiom text in ${sourceLanguage}
-- mainTranslation/variations/etymology/literature.translation/idiom.translation/idiom.context in ${targetLanguage}
-- variations are ${targetLanguage} alternatives (NOT ${sourceLanguage} synonyms)
-- Uzbek text must be Latin script only
-- No English explanations; no markdown
-- Keep short: 2 synonyms, 2 variations, 1 literature example, 1 idiom
-JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["...","..."],"variations":[{"text":"...","confidence":0.9},{"text":"...","confidence":0.8}],"literature":[{"text":"...","translation":"...","source":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
+
+LANGUAGE RULES (STRICT):
+- "term" = the original ${sourceLanguage} word.
+- "mainTranslation" = the most common, natural ${targetLanguage} translation.
+- "synonyms" = ONLY ${sourceLanguage} words/phrases that mean the same as "${query}". NEVER put ${targetLanguage} words here.
+- "variations" = ONLY ${targetLanguage} alternative translations of "${query}". NEVER put ${sourceLanguage} words here.
+- "literature[].text" and "idioms[].text" = ${sourceLanguage} example sentences using "${query}".
+- "literature[].translation" and "idioms[].translation" = ${targetLanguage} translation of that example.
+- "etymology" and "idioms[].context" = in ${targetLanguage}.
+- When ${targetLanguage} is Uzbek, use ONLY Latin Uzbek script (e.g., "baxtli", "xursand", "quvnoq"), NEVER Cyrillic.
+- Output ONLY the JSON object. No markdown, no explanation.
+
+Example for English → Uzbek query "happy":
+{"term":"happy","mainTranslation":"baxtli","partOfSpeech":"adjective","gender":"","plural":"","cefrLevel":"A1","etymology":"Ingilizcha 'hap' (tasodif) so'zidan kelib chiqqan.","synonyms":["joyful","cheerful","glad"],"variations":[{"text":"xursand","confidence":0.95},{"text":"quvnoq","confidence":0.85}],"literature":[{"text":"She felt happy about the news.","translation":"U xabaridan xursand edi.","source":"Everyday English"}],"idioms":[{"text":"happy as a clam","translation":"juda baxtli","context":"katta mamnuniyat ifodalash uchun"}]}
+
+Now translate "${query}" (${sourceLanguage} → ${targetLanguage}) in the same format:`;
 
   let raw: any;
   try {
