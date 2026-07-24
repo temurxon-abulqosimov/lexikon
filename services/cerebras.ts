@@ -24,6 +24,16 @@ function shuffleArray<T>(array: T[]): T[] {
   return newArray;
 }
 
+function extractOpenRouterError(errText: string): string {
+  try {
+    const parsed = JSON.parse(errText);
+    if (parsed.error?.message) return parsed.error.message;
+    if (parsed.error) return JSON.stringify(parsed.error);
+    if (parsed.message) return parsed.message;
+  } catch {}
+  return errText;
+}
+
 /**
  * Attempts to repair truncated JSON by appending missing closing braces/brackets.
  * This is a best-effort fallback when the model runs out of tokens mid-object.
@@ -120,7 +130,7 @@ async function openrouterRequest<T>(
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} – ${errText}`);
+      throw new Error(`OpenRouter API error: ${response.status} – ${extractOpenRouterError(errText)}`);
     }
 
     const data = await response.json();
@@ -193,7 +203,7 @@ async function openrouterRequestStream<T>(
 
       if (!response.ok) {
         const errText = await response.text();
-        const err = new Error(`OpenRouter API error: ${response.status} – ${errText}`);
+        const err = new Error(`OpenRouter API error: ${response.status} – ${extractOpenRouterError(errText)}`);
         if ((response.status === 429 || response.status >= 500) && attempt < retries) {
           lastError = err;
           continue;
@@ -347,7 +357,7 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
       userPrompt,
       (content) => onPartial?.(content),
       2048,
-      "google/gemini-2.5-flash-preview:free",
+      "deepseek/deepseek-chat:free",
       1
     );
   }

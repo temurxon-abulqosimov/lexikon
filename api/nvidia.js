@@ -48,7 +48,12 @@ export default async function handler(req, res) {
 
     if (!upstream.ok) {
       const errText = await upstream.text();
-      return res.status(upstream.status).json({ error: errText });
+      let message = errText;
+      try {
+        const parsed = JSON.parse(errText);
+        message = parsed.error?.message || parsed.message || errText;
+      } catch {}
+      return res.status(upstream.status).json({ error: message });
     }
 
     // True SSE streaming: forward chunks to client as they arrive
