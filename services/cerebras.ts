@@ -328,16 +328,14 @@ export async function translateAndEnrich(
   const systemPrompt =
     "You are a dictionary. Output ONLY valid JSON. No text before or after.";
 
-  const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage}.
-STRICT LANGUAGE RULES:
-- term, synonyms, literature text, idiom text MUST be in ${sourceLanguage}.
-- mainTranslation, variations, etymology, literature.translation, idiom.translation, idiom.context MUST be in ${targetLanguage}.
-- variations are alternative ${targetLanguage} words/phrases for the mainTranslation (NOT ${sourceLanguage} synonyms).
-- When ${targetLanguage} is Uzbek, ALL Uzbek output MUST be in Latin script (e.g., "salom", "kitob", "murakkab") — NEVER Cyrillic.
-- Do NOT translate explanations or example translations into English; use ${targetLanguage} only.
-- Keep source/author names in their original language.
-- Keep the response concise: 2 synonyms, 2 variations, 1 literature example, 1 idiom.
-- Output ONLY the JSON object, no markdown, no explanation.
+  const userPrompt = `Translate "${query}" from ${sourceLanguage} to ${targetLanguage}. Output ONLY compact JSON.
+Rules:
+- term/synonyms/literature/idiom text in ${sourceLanguage}
+- mainTranslation/variations/etymology/literature.translation/idiom.translation/idiom.context in ${targetLanguage}
+- variations are ${targetLanguage} alternatives (NOT ${sourceLanguage} synonyms)
+- Uzbek text must be Latin script only
+- No English explanations; no markdown
+- Keep short: 2 synonyms, 2 variations, 1 literature example, 1 idiom
 JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plural":"","cefrLevel":"","etymology":"...","synonyms":["...","..."],"variations":[{"text":"...","confidence":0.9},{"text":"...","confidence":0.8}],"literature":[{"text":"...","translation":"...","source":"..."}],"idioms":[{"text":"...","translation":"...","context":"..."}]}`;
 
   let raw: any;
@@ -346,7 +344,7 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
       systemPrompt,
       userPrompt,
       (content) => onPartial?.(content),
-      2048,
+      4096,
       undefined,
       1
     );
@@ -356,7 +354,7 @@ JSON:{"term":"...","mainTranslation":"...","partOfSpeech":"...","gender":"","plu
       systemPrompt,
       userPrompt,
       (content) => onPartial?.(content),
-      2048,
+      4096,
       "nvidia/nemotron-3-nano-30b-a3b:free",
       1
     );
